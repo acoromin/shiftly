@@ -1,7 +1,6 @@
 from django import forms
 from django.utils import timezone
 
-from employees.models import EmployeeProfile
 from employees.selectors import active_employees_for_company
 
 from .models import TimeClockEntry
@@ -18,11 +17,10 @@ class ManualTimeClockEntryForm(forms.ModelForm):
 
     def __init__(self, *args, company=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if company:
-            employees = active_employees_for_company(company)
-        else:
-            employees = EmployeeProfile.objects.filter(is_active=True)
-        self.fields['employee'].queryset = employees
+        self.fields['employee'].queryset = active_employees_for_company(company)
+        # company is intentionally excluded from the customer-facing form.
+        # Set it before ModelForm runs the model's cross-company validation.
+        self.instance.company = company
         self.fields['timestamp'].initial = timezone.localtime().strftime('%Y-%m-%dT%H:%M')
         for field in self.fields.values():
             current_class = field.widget.attrs.get('class', '')

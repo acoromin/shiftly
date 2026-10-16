@@ -1,9 +1,9 @@
 from datetime import date, time, timedelta
-from importlib import import_module
 
-from django.apps import apps
+from django.contrib import admin
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -107,7 +107,7 @@ class TimeClockTests(TestCase):
         self.assertEqual(entry.company, company)
         self.assertEqual(entry.workplace, workplace)
 
-    def test_entry_allows_empty_company_and_workplace_temporarily(self):
+    def test_entry_requires_company(self):
         entry = TimeClockEntry(
             employee=self.employee,
             entry_type=TimeClockEntry.EntryType.IN,
@@ -116,10 +116,68 @@ class TimeClockTests(TestCase):
             created_by=self.user,
         )
 
-        entry.full_clean()
+        with self.assertRaises(ValidationError) as context:
+            entry.full_clean()
 
-        self.assertIsNone(entry.company)
+        self.assertIn('company', context.exception.message_dict)
+        with self.assertRaises(ValidationError):
+            entry.save()
+        self.assertFalse(TimeClockEntry.objects.exists())
+
+    def test_database_rejects_missing_company_even_without_model_validation(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TimeClockEntry.objects.bulk_create([TimeClockEntry(
+                employee=self.employee,
+                entry_type=TimeClockEntry.EntryType.IN,
+                timestamp=timezone.now(),
+                created_by=self.user,
+            )])
+
+    def test_entry_allows_empty_workplace_with_company(self):
+        entry = TimeClockEntry.objects.create(
+            employee=self.employee,
+            company=self.company,
+            entry_type=TimeClockEntry.EntryType.IN,
+            timestamp=timezone.now(),
+            created_by=self.user,
+        )
+
+        entry.refresh_from_db()
         self.assertIsNone(entry.workplace)
+
+    def test_save_rejects_company_change_that_mismatches_employee(self):
+        entry = TimeClockEntry.objects.create(
+            employee=self.employee,
+            company=self.company,
+            entry_type=TimeClockEntry.EntryType.IN,
+            timestamp=timezone.now(),
+            created_by=self.user,
+        )
+        entry.company = Company.objects.create(name='Empresa B')
+
+        with self.assertRaises(ValidationError) as context:
+            entry.save(update_fields=['company'])
+
+        self.assertIn('employee', context.exception.message_dict)
+        entry.refresh_from_db()
+        self.assertEqual(entry.company, self.company)
+
+    def test_resolve_context_requires_employee_company(self):
+        employee_without_company = EmployeeProfile(user=self.user, full_name='Sin empresa')
+
+        for employee in (None, employee_without_company):
+            with self.subTest(employee=employee), self.assertRaises(ValidationError) as context:
+                resolve_timeclock_entry_context(employee)
+            self.assertIn('company', context.exception.message_dict)
+
+    def test_django_admin_exposes_required_company(self):
+        model_admin = admin.site._registry[TimeClockEntry]
+        request = self.factory.get('/admin/')
+        request.user = self.user
+        form = model_admin.get_form(request)
+
+        self.assertTrue(form.base_fields['company'].required)
+        self.assertIn('company', model_admin.autocomplete_fields)
 
     def test_entry_employee_must_belong_to_entry_company(self):
         company = Company.objects.create(name='Empresa A')
@@ -212,26 +270,28 @@ class TimeClockTests(TestCase):
 
         self.assertIn('related_shift', context.exception.message_dict)
 
-    def test_backfill_assigns_company_and_employee_primary_workplace(self):
-        company = Company.objects.create(name='Empresa A')
-        workplace = Workplace.objects.create(company=company, name='Centro A')
-        self.employee.company = company
-        self.employee.primary_workplace = workplace
-        self.employee.save(update_fields=['company', 'primary_workplace'])
-        entry = TimeClockEntry.objects.create(
-            employee=self.employee,
-            entry_type=TimeClockEntry.EntryType.IN,
-            timestamp=timezone.now(),
-            status=TimeClockEntry.Status.VALID,
-            created_by=self.user,
+    def test_clock_rejects_related_shift_of_another_employee_in_same_company(self):
+        other_user = User.objects.create_user(username='luis', password='secret')
+        other_employee = EmployeeProfile.objects.create(
+            user=other_user,
+            company=self.company,
+            full_name='Luis Perez',
+            start_date=date(2026, 1, 1),
         )
-        migration = import_module('timeclock.migrations.0005_backfill_timeclockentry_company_workplace')
+        shift = Shift.objects.create(
+            employee=other_employee,
+            company=self.company,
+            date=date(2026, 6, 23),
+            start_time=time(8, 0),
+            end_time=time(16, 0),
+        )
 
-        migration.backfill_timeclockentry_company_workplace(apps, None)
-        entry.refresh_from_db()
+        with self.assertRaises(ValidationError) as context:
+            attempt_clock(self.request(), self.employee, 'valid-token', related_shift=shift)
 
-        self.assertEqual(entry.company, company)
-        self.assertEqual(entry.workplace, workplace)
+        self.assertIn('related_shift', context.exception.message_dict)
+        self.assertFalse(TimeClockEntry.objects.exists())
+        self.assertFalse(AuditLog.objects.exists())
 
     def test_timeclock_entries_for_company_only_returns_company_entries(self):
         company, workplace = self.set_employee_context()
@@ -260,13 +320,6 @@ class TimeClockTests(TestCase):
             status=TimeClockEntry.Status.VALID,
             created_by=other_user,
         )
-        TimeClockEntry.objects.create(
-            employee=self.employee,
-            entry_type=TimeClockEntry.EntryType.OUT,
-            timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 16, 0)),
-            status=TimeClockEntry.Status.VALID,
-            created_by=self.user,
-        )
 
         self.assertEqual(list(timeclock_entries_for_company(company)), [entry])
         self.assertFalse(timeclock_entries_for_company(None).exists())
@@ -281,6 +334,7 @@ class TimeClockTests(TestCase):
         )
         entry = TimeClockEntry.objects.create(
             employee=self.employee,
+            company=self.employee.company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 8, 0)),
             status=TimeClockEntry.Status.VALID,
@@ -288,6 +342,7 @@ class TimeClockTests(TestCase):
         )
         TimeClockEntry.objects.create(
             employee=other_employee,
+            company=other_employee.company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 9, 0)),
             status=TimeClockEntry.Status.VALID,
@@ -296,56 +351,11 @@ class TimeClockTests(TestCase):
 
         self.assertEqual(list(timeclock_entries_for_employee(self.employee)), [entry])
 
-    def test_backfill_prefers_related_shift_workplace(self):
-        company = Company.objects.create(name='Empresa A')
-        employee_workplace = Workplace.objects.create(company=company, name='Centro empleado')
-        shift_workplace = Workplace.objects.create(company=company, name='Centro turno')
-        self.employee.company = company
-        self.employee.primary_workplace = employee_workplace
-        self.employee.save(update_fields=['company', 'primary_workplace'])
-        shift = Shift.objects.create(
-            employee=self.employee,
-            company=company,
-            workplace=shift_workplace,
-            date=date(2026, 6, 23),
-            start_time=time(8, 0),
-            end_time=time(16, 0),
-        )
-        entry = TimeClockEntry.objects.create(
-            employee=self.employee,
-            related_shift=shift,
-            entry_type=TimeClockEntry.EntryType.IN,
-            timestamp=timezone.now(),
-            status=TimeClockEntry.Status.VALID,
-            created_by=self.user,
-        )
-        migration = import_module('timeclock.migrations.0005_backfill_timeclockentry_company_workplace')
-
-        migration.backfill_timeclockentry_company_workplace(apps, None)
-        entry.refresh_from_db()
-
-        self.assertEqual(entry.company, company)
-        self.assertEqual(entry.workplace, shift_workplace)
-
     def test_missing_clock_incident_saves_company_from_entry(self):
         company = self.employee.company
         TimeClockEntry.objects.create(
             employee=self.employee,
             company=company,
-            entry_type=TimeClockEntry.EntryType.IN,
-            timestamp=timezone.now() - timedelta(hours=19),
-            status=TimeClockEntry.Status.VALID,
-            created_by=self.user,
-        )
-
-        incident = ensure_missing_clock_incident(self.employee)
-
-        self.assertEqual(incident.company, company)
-
-    def test_missing_clock_incident_falls_back_to_employee_company(self):
-        company, _workplace = self.set_employee_context()
-        TimeClockEntry.objects.create(
-            employee=self.employee,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.now() - timedelta(hours=19),
             status=TimeClockEntry.Status.VALID,
@@ -365,6 +375,7 @@ class TimeClockTests(TestCase):
         self.assertFalse(ok)
         self.assertEqual(message, 'QR no válido o caducado.')
         self.assertEqual(entry.status, TimeClockEntry.Status.INVALID_QR)
+        self.assertEqual(entry.company, self.company)
 
     def test_blocks_wrong_wifi_ip(self):
         ok, message, entry = attempt_clock(self.request(ip='198.51.100.7'), self.employee, 'valid-token')
@@ -372,6 +383,7 @@ class TimeClockTests(TestCase):
         self.assertFalse(ok)
         self.assertEqual(message, 'Debes estar conectado al WiFi del bar para fichar.')
         self.assertEqual(entry.status, TimeClockEntry.Status.BLOCKED_IP)
+        self.assertEqual(entry.company, self.company)
 
     def test_valid_clock_toggles_in_and_out(self):
         ok_in, message_in, entry_in = attempt_clock(self.request(), self.employee, 'valid-token')
@@ -403,6 +415,7 @@ class TimeClockTests(TestCase):
         )
         TimeClockEntry.objects.create(
             employee=self.employee,
+            company=self.employee.company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 8, 0)),
             status=TimeClockEntry.Status.VALID,
@@ -410,6 +423,7 @@ class TimeClockTests(TestCase):
         )
         TimeClockEntry.objects.create(
             employee=other,
+            company=other.company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 9, 0)),
             status=TimeClockEntry.Status.VALID,
@@ -486,6 +500,7 @@ class TimeClockTests(TestCase):
         unassigned_user = User.objects.create_user(username='sinperfil', password='secret')
         TimeClockEntry.objects.create(
             employee=self.employee,
+            company=self.employee.company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 8, 0)),
             status=TimeClockEntry.Status.VALID,
@@ -585,7 +600,7 @@ class TimeClockTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('employee', form.errors)
 
-    def test_manual_clock_form_without_company_keeps_global_active_employee_queryset(self):
+    def test_manual_clock_form_without_company_rejects_employees(self):
         other_user = User.objects.create_user(username='luis', password='secret')
         other = EmployeeProfile.objects.create(
             user=other_user,
@@ -597,8 +612,17 @@ class TimeClockTests(TestCase):
         form = ManualTimeClockEntryForm(company=None)
 
         employees = form.fields['employee'].queryset
-        self.assertIn(self.employee, employees)
-        self.assertIn(other, employees)
+        self.assertFalse(employees.exists())
+        for employee in (self.employee, other):
+            with self.subTest(employee=employee.pk):
+                bound_form = ManualTimeClockEntryForm({
+                    'employee': employee.pk,
+                    'entry_type': TimeClockEntry.EntryType.IN,
+                    'timestamp': timezone.localtime().strftime('%Y-%m-%dT%H:%M'),
+                    'manual_reason': 'Fichaje sin contexto de empresa.',
+                })
+                self.assertFalse(bound_form.is_valid())
+                self.assertIn('employee', bound_form.errors)
 
     def test_admin_with_company_cannot_create_manual_clock_for_other_company_employee(self):
         self.set_employee_context()
@@ -739,6 +763,7 @@ class TimeClockTests(TestCase):
     def test_worker_cannot_correct_entry(self):
         entry = TimeClockEntry.objects.create(
             employee=self.employee,
+            company=self.employee.company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.now(),
             status=TimeClockEntry.Status.VALID,

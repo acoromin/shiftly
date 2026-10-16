@@ -191,6 +191,7 @@ class MonthlySummaryTests(TestCase):
         )
         TimeClockEntry.objects.create(
             employee=self.employee,
+            company=self.employee.company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 8, 0)),
             status=TimeClockEntry.Status.VALID,
@@ -198,6 +199,7 @@ class MonthlySummaryTests(TestCase):
         )
         TimeClockEntry.objects.create(
             employee=self.employee,
+            company=self.employee.company,
             entry_type=TimeClockEntry.EntryType.OUT,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 23, 16, 30)),
             status=TimeClockEntry.Status.VALID,
@@ -214,6 +216,13 @@ class MonthlySummaryTests(TestCase):
     def test_calculate_employee_summary_filters_by_company_data(self):
         company = self.set_employee_company(name='Empresa A')
         other_company = Company.objects.create(name='Empresa B')
+        other_user = User.objects.create_user(username='luis', password='secret')
+        other_employee = EmployeeProfile.objects.create(
+            user=other_user,
+            company=other_company,
+            full_name='Luis Perez',
+            start_date=date(2026, 1, 1),
+        )
         Shift.objects.create(
             employee=self.employee,
             company=company,
@@ -238,20 +247,20 @@ class MonthlySummaryTests(TestCase):
             created_by=self.user,
         )
         TimeClockEntry.objects.create(
-            employee=self.employee,
+            employee=other_employee,
             company=other_company,
             entry_type=TimeClockEntry.EntryType.IN,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 24, 8, 0)),
             status=TimeClockEntry.Status.VALID,
-            created_by=self.user,
+            created_by=other_user,
         )
         TimeClockEntry.objects.create(
-            employee=self.employee,
+            employee=other_employee,
             company=other_company,
             entry_type=TimeClockEntry.EntryType.OUT,
             timestamp=timezone.make_aware(timezone.datetime(2026, 6, 24, 12, 0)),
             status=TimeClockEntry.Status.VALID,
-            created_by=self.user,
+            created_by=other_user,
         )
 
         summary = calculate_employee_summary(self.employee, 2026, 6, company=company)

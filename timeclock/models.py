@@ -29,8 +29,6 @@ class TimeClockEntry(models.Model):
         on_delete=models.PROTECT,
         related_name='timeclock_entries',
         verbose_name='empresa',
-        blank=True,
-        null=True,
     )
     workplace = models.ForeignKey(
         'companies.Workplace',
@@ -99,7 +97,15 @@ class TimeClockEntry(models.Model):
             and self.related_shift.company_id != self.company_id
         ):
             errors['related_shift'] = 'El turno relacionado debe pertenecer a la misma empresa que el fichaje.'
+        if (
+            self.related_shift_id
+            and self.employee_id
+            and self.related_shift.employee_id != self.employee_id
+        ):
+            errors['related_shift'] = 'El turno relacionado debe pertenecer al mismo empleado que el fichaje.'
         if errors:
             raise ValidationError(errors)
 
-# Create your models here.
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from audit.models import AuditLog
@@ -64,7 +65,9 @@ def next_entry_type(employee):
 
 
 def resolve_timeclock_entry_context(employee, related_shift=None):
-    company = employee.company if employee and employee.company_id else None
+    if employee is None or not employee.company_id:
+        raise ValidationError({'company': 'El empleado debe tener una empresa para registrar fichajes.'})
+    company = employee.company
     workplace = None
     if company:
         if (
@@ -112,7 +115,6 @@ def create_timeclock_entry(
         created_by=created_by,
     )
     apply_timeclock_entry_context(entry, related_shift=related_shift)
-    entry.full_clean()
     entry.save()
     return entry
 

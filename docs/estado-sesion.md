@@ -1,6 +1,6 @@
 # Estado de sesion
 
-Fecha ultima actualizacion: 2026-09-07
+Fecha ultima actualizacion: 2026-10-16
 
 Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `mira estado-sesion`, leer este archivo primero, comprobar el estado real del repo y actuar segun `Siguiente Accion Operativa`.
 
@@ -19,24 +19,23 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Primero estabilizar la fase recien hecha si sigue sin commit o sin migracion aplicada en la base usada.
-- Comprobar `git status --short`.
-- Comprobar `./.venv/bin/python manage.py showmigrations incidents`.
-- Si `incidents.0007_alter_incident_company` no esta aplicada en la base local y se va a continuar sobre esa base, ejecutar `./.venv/bin/python manage.py migrate incidents` o `./.venv/bin/python manage.py migrate` antes de nuevas auditorias de datos.
-- Siguiente fase tecnica: `fase-hardening-timeclockentry-company-not-null`.
-- Motivo: payroll depende de fichajes y no debe endurecerse antes de que `TimeClockEntry.company` sea fiable.
-- No adelantar payroll ni workplace antes de cerrar `TimeClockEntry.company`.
+- Fase cerrada en esta copia: `fase-hardening-timeclockentry-company-not-null` (codigo, migracion local, tests y documentacion).
+- Siguiente fase tecnica: `fase-cierre-company-none-en-apis-internas` (fase 2 de la hoja de ruta), antes de endurecer payroll.
+- Comprobar primero `git status --short` y `./.venv/bin/python manage.py migrate --plan`.
+- Auditar formularios/servicios reutilizables de `scheduling/forms.py`, `timeclock/forms.py` y `payroll/services.py`: sin empresa deben fallar cerrado o usar una API tecnica global explicita. El formulario manual de fichajes ya esta cerrado.
+- No adelantar las fases NOT NULL de payroll, workplace, QR/IP por centro ni cambios visuales.
+- La base local se ha creado nueva en esta sesion y no contiene fichajes. Si se recupera la base original, hacer copia y repetir la auditoria antes de aplicar migraciones; la validacion local no acredita sus datos.
 
 ## Estado Actual Del Proyecto
 
-- Fase actual implementada en codigo: `fase-hardening-incident-company-not-null`.
-- Ultimo commit conocido antes de esa fase: `feb6fc4` (`fase-hardening-leaverequest-company-not-null`).
-- La fase de incident esta en el worktree; si no se ha hecho commit, tratarla como cambios pendientes propios y no revertirla.
+- Fase cerrada en esta copia: `fase-hardening-timeclockentry-company-not-null`; validada con Django, migracion aplicada en base local nueva y suite completa en verde.
+- Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
+- El commit de cierre de esta fase incluye los cambios de fichajes, sus tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
 - `Shift.company` es obligatorio.
 - `LeaveRequest.company` es obligatorio.
 - `Incident.company` es obligatorio en codigo y migracion `incidents/migrations/0007_alter_incident_company.py`.
-- `TimeClockEntry.company` sigue nullable y es el siguiente hueco critico.
+- `TimeClockEntry.company` es obligatorio en modelo y DB local con `timeclock.0006_alter_timeclockentry_company` aplicada. Su auditoria previa bloquea null e inconsistencias antes de cambiar el esquema.
 - `MonthlyHoursSummary.company`, `PayrollDraft.company` y `PayrollDraftLine.company` siguen nullable.
 - `EmployeeProfile.primary_workplace`, `Shift.workplace` y `TimeClockEntry.workplace` siguen nullable y fuera del siguiente paso.
 - Admin operativo sin `company` esta cerrado en vistas cliente.
@@ -47,6 +46,17 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - `docs/hardening-company-not-null-plan.md` es plan historico de la primera etapa; la fuente viva es este archivo.
 
 ## Ultima Auditoria De Datos
+
+Auditoria local 2026-10-16, previa a `timeclock.0006`, por ORM:
+
+- Base nueva creada durante esta sesion; no corresponde a la base original de septiembre.
+- `TimeClockEntry`: total 0, `company=NULL` 0, mismatch employee/company 0, workplace/company 0, related_shift/company 0, related_shift/employee 0.
+- Sin datos que sanear ni backfill adicional necesario en esta base.
+- `incidents.0007` verificada como aplicada antes de la nueva migracion.
+- Tras aplicar migraciones: `company_id NOT NULL` y `workplace_id` nullable verificados por introspeccion SQLite.
+- Copia de la base local previa a aplicar `timeclock.0006`: `backups/shiftly-pre-timeclock-company-20261016-213011.sqlite3` (ignorada por Git).
+
+Auditoria historica de otra base, conservada sin presentar sus datos como actuales:
 
 Fecha: 2026-09-07
 
@@ -65,6 +75,19 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Fase `fase-hardening-timeclockentry-company-not-null`, 2026-10-16:
+
+- `./.venv/bin/python manage.py test timeclock incidents dashboard payroll reports --noinput`: 77 tests OK.
+- `./.venv/bin/python manage.py test --noinput`: 154 tests OK.
+- `./.venv/bin/python manage.py check`: OK.
+- `./.venv/bin/python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `./.venv/bin/python manage.py migrate --noinput`: OK; `incidents.0007` y `timeclock.0006` aplicadas en base local nueva.
+- Introspeccion SQLite: empresa NOT NULL y centro nullable confirmados.
+- Compilacion Python y `git diff --check`: OK.
+- Las pruebas de migracion cubren conservacion de fichajes y centros, backfill historico y rechazo de los cinco casos de datos incompatibles antes de modificar el esquema.
+
+Resultados historicos:
 
 Fase `fase-hardening-incident-company-not-null`:
 
@@ -146,15 +169,16 @@ Validaciones historicas relevantes:
 - `Shift.company` no permite `null=True` ni `blank=True`.
 - `LeaveRequest.company` no permite `null=True` ni `blank=True`.
 - `Incident.company` no permite `null=True` ni `blank=True`.
+- `TimeClockEntry.company` no permite `null=True` ni `blank=True`; `save()` ejecuta `full_clean()` en altas y actualizaciones.
+- `TimeClockEntry.related_shift.employee` debe coincidir con `TimeClockEntry.employee`.
+- El formulario manual de fichajes no consulta empleados globalmente si falta empresa.
 - Django Admin expone `company` en `EmployeeProfile`, `Shift`, `LeaveRequest` e `Incident` para no romper creacion tecnica.
 
 ## Invariantes Pendientes
 
-- `TimeClockEntry.company` debe ser obligatorio.
 - `MonthlyHoursSummary.company` debe ser obligatorio.
 - `PayrollDraft.company` debe ser obligatorio salvo decision explicita de borradores globales.
 - `PayrollDraftLine.company` debe ser obligatorio y coincidir con `draft.company` y `employee.company`.
-- `TimeClockEntry.related_shift.employee` debe coincidir con `TimeClockEntry.employee`.
 - `Incident.shift.employee` debe coincidir con `Incident.employee`.
 - `Incident.timeclock_entry.employee` debe coincidir con `Incident.employee`.
 - `LeaveRequest.reviewed_by` e `Incident.resolved_by` deberian validarse contra la misma empresa cuando exista perfil.
@@ -189,6 +213,7 @@ Validaciones historicas relevantes:
 - `fase-hardening-shift-company-not-null`: `Shift.company` obligatorio con migracion unica y admin tecnico ajustado.
 - `fase-hardening-leaverequest-company-not-null`: `LeaveRequest.company` obligatorio con migracion unica y admin tecnico ajustado.
 - `fase-hardening-incident-company-not-null`: `Incident.company` obligatorio con migracion unica y admin tecnico ajustado.
+- `fase-hardening-timeclockentry-company-not-null`: empresa obligatoria en fichajes, guardas de migracion, validacion al guardar, formulario manual cerrado sin empresa y 154 tests OK; aplicada en base local nueva.
 
 ## Hoja De Ruta Priorizada
 
@@ -312,7 +337,7 @@ Validaciones historicas relevantes:
 - Validaciones: tests audit/core/timeclock, revision documental, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
 - Done: la documentacion refleja el estado actual y los logs permiten investigacion por tenant.
 
-## Plan Detallado De La Siguiente Fase
+## Plan Detallado Conservado De La Fase De Fichajes (Cerrada)
 
 Fase: `fase-hardening-timeclockentry-company-not-null`
 
@@ -362,7 +387,7 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 
 ## Deudas Pendientes Importantes
 
-- Ejecutar `fase-hardening-timeclockentry-company-not-null`.
+- Ejecutar `fase-cierre-company-none-en-apis-internas` antes de endurecer payroll.
 - Endurecer payroll por fases: `MonthlyHoursSummary`, `PayrollDraft`, `PayrollDraftLine`.
 - Cerrar `company=None` en APIs internas y formularios reutilizables.
 - Decidir cuando endurecer `workplace` a no nullable por modelo.
@@ -371,3 +396,44 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - Aislar Django Admin por tenant o reservarlo a superuser tecnico.
 - Anadir contexto `company`/`workplace` a `AuditLog` cuando aplique.
 - Actualizar o archivar documentacion obsoleta.
+
+## Sesion 2026-10-16 - Preparacion Inicial (Historico; Cierre A Continuacion)
+
+### Cambios Preparados
+
+- `TimeClockEntry.company` pierde `null=True` y `blank=True`; la obligatoriedad la valida `full_clean()`, tambien ejecutado desde `save()` para cubrir creacion y correcciones.
+- `TimeClockEntry.clean()` rechaza un `related_shift` que pertenezca a otro empleado, incluso si ambos empleados son de la misma empresa.
+- El servicio de contexto rechaza empleados sin empresa antes de crear fichajes; el servicio de creacion utiliza el `save()` validado del modelo.
+- `ManualTimeClockEntryForm` devuelve queryset vacio sin empresa y asigna la empresa autorizada a la instancia antes de la validacion del modelo.
+- Django Admin incluye empresa en listado/filtros/autocompletado; su formulario exige empresa.
+- Una unica migracion nueva, `timeclock.0006_alter_timeclockentry_company`, ejecuta una auditoria sin escrituras antes de `AlterField`: null, employee/company, workplace/company, related_shift/company y related_shift/employee. Si falla, aborta con conteos, sin asignar empresas por defecto ni corregir datos silenciosamente.
+- La migracion depende de las fases previas de EmployeeProfile, Shift e Incident para garantizar el orden de aplicacion.
+- Fixtures de timeclock/payroll actualizadas para usar empresas coherentes. Los tests actuales ya no tratan company=NULL como valido.
+- Los tests de backfill usan modelos y esquema historicos con `MigrationExecutor`, donde company=NULL si era representable. Cubren preservacion de datos y bloqueo de la nueva migracion ante cada inconsistencia.
+- Se mantienen `workplace` nullable, configuracion global, QR/IP, templates y diseno visual sin cambios.
+
+### Entorno Y Datos
+
+- Worktree inicialmente limpio, baseline `ccfe280`.
+- No habia `.venv` ni `db.sqlite3` en esta copia; no se ha localizado ni modificado la base original.
+- `.venv` creado con Python 3.13. Instalacion de requirements intentada y fallida por resolucion de red bloqueada; Django sigue sin instalarse.
+- No se ha creado una base vacia para presentarla como auditoria de datos existentes.
+- Se ha solicitado al usuario instalar las dependencias desde un terminal con red mientras se preparaba el codigo.
+
+### Verificaciones Y Cierre Pendiente
+
+- Compilacion Python de todas las apps: OK.
+- `git diff --check`: OK.
+- Revision AST de fixtures actuales: todos los `TimeClockEntry.objects.create()` especifican empresa.
+- Auditoria ORM, migraciones, `manage.py check`, `makemigrations --check --dry-run`, tests relacionados y suite completa: PENDIENTES por falta de Django.
+- Sin commit de cierre: la fase no debe marcarse terminada hasta validar y aplicar la migracion en el entorno disponible. La base original requerira su propia auditoria/copia/aplicacion si se recupera posteriormente.
+
+## Cierre 2026-10-16 - Fichajes Con Empresa Obligatoria
+
+- El usuario ha instalado las dependencias desde su terminal; verificado Django 5.2.15, asgiref 3.11.1 y sqlparse 0.5.5 en `.venv`.
+- Base SQLite local nueva creada y migraciones previas de employees/scheduling/incidents aplicadas. Auditoria ORM previa de fichajes: total 0 y todos los conteos de null/inconsistencias 0.
+- Tests relacionados: 77 OK. Suite completa: 154 OK. `check`, `makemigrations --check --dry-run`, compilacion y `git diff --check`: OK.
+- Copia local realizada y todas las migraciones aplicadas, incluida `timeclock.0006`; introspeccion confirma empresa NOT NULL y centro todavia nullable.
+- Fase cerrada para el codigo y el entorno local disponible. No se ha accedido a la base original ni se ha acreditado su estado; si aparece, hacer copia y auditar antes de migrar.
+- Commit local de cierre: mensaje `fase-hardening-timeclockentry-company-not-null`; sin push.
+- Siguiente fase: `fase-cierre-company-none-en-apis-internas`. No se ha implementado ninguna fase posterior.
