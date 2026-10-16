@@ -19,16 +19,16 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Fase cerrada: `fase-cierre-company-none-en-apis-internas` (fase 2).
-- Siguiente fase: `fase-hardening-monthlysummary-company-not-null` (fase 3).
-- Auditar por ORM los resumenes sin empresa o con empresa distinta del empleado antes de cambiar el esquema.
-- Proteger modelo/admin y actualizar tests legacy; despues crear una unica migracion de MonthlyHoursSummary, pasar tests relacionados y suite completa, aplicar y documentar.
-- No adelantar PayrollDraft/PayrollDraftLine ni workplace/QR/IP/diseno antes de cerrar esta fase.
+- Fase cerrada: `fase-hardening-monthlysummary-company-not-null` (fase 3), con migracion local aplicada.
+- Siguiente fase: `fase-hardening-payrolldraft-company-not-null` (fase 4).
+- Auditar borradores sin empresa, vacios y con lineas de empresas distintas antes de cambiar el esquema. No inferir empresa silenciosamente para borradores ambiguos.
+- Proteger altas/ediciones y admin, crear una migracion minima y comprobar preservacion de datos, tests relacionados y suite completa antes de cerrar.
+- No adelantar las lineas ni workplace/QR/IP/diseno antes de cerrar esta fase.
 - La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias.
 
 ## Estado Actual Del Proyecto
 
-- Fase cerrada: `fase-cierre-company-none-en-apis-internas`; 161 tests OK. Baseline anterior: `7bd6a75` (fichajes con empresa obligatoria).
+- Fase cerrada: `fase-hardening-monthlysummary-company-not-null`; 165 tests OK y migracion local aplicada. Baseline anterior: `0c4452a` (APIs internas sin empresa).
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
 - El commit de cierre de esta fase incluye los cambios de fichajes, sus tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
@@ -36,7 +36,8 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - `LeaveRequest.company` es obligatorio.
 - `Incident.company` es obligatorio en codigo y migracion `incidents/migrations/0007_alter_incident_company.py`.
 - `TimeClockEntry.company` es obligatorio en modelo y DB local con `timeclock.0006_alter_timeclockentry_company` aplicada. Su auditoria previa bloquea null e inconsistencias antes de cambiar el esquema.
-- `MonthlyHoursSummary.company`, `PayrollDraft.company` y `PayrollDraftLine.company` siguen nullable.
+- `MonthlyHoursSummary.company` es obligatorio y coherente con el empleado; `payroll.0005` aplicada localmente.
+- `PayrollDraft.company` y `PayrollDraftLine.company` siguen nullable.
 - `EmployeeProfile.primary_workplace`, `Shift.workplace` y `TimeClockEntry.workplace` siguen nullable y fuera del siguiente paso.
 - Admin operativo sin `company` esta cerrado en vistas cliente.
 - Staff/superuser sin perfil no tiene panel operativo global de cliente.
@@ -46,6 +47,8 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - `docs/hardening-company-not-null-plan.md` es plan historico de la primera etapa; la fuente viva es este archivo.
 
 ## Ultima Auditoria De Datos
+
+Auditoria ORM local 2026-10-16 previa a `payroll.0005`: MonthlyHoursSummary total 0, company=NULL 0, mismatch employee/company 0. Base nueva; sin backfill adicional. Copia previa: `backups/shiftly-pre-monthlysummary-20261016-214213.sqlite3`. Esquema posterior NOT NULL confirmado por introspeccion.
 
 Auditoria local 2026-10-16, previa a `timeclock.0006`, por ORM:
 
@@ -75,6 +78,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Fase `fase-hardening-monthlysummary-company-not-null`, 2026-10-16: tests `payroll reports timeclock dashboard` 69 OK; suite global 165 OK; check, makemigrations --check --dry-run y diff --check OK; `payroll.0005` aplicada e introspeccion NOT NULL OK.
 
 Fase `fase-cierre-company-none-en-apis-internas`, 2026-10-16:
 
@@ -166,6 +171,8 @@ Validaciones historicas relevantes:
 
 ## Invariantes Cerradas
 
+- MonthlyHoursSummary exige empresa en modelo y DB; save() valida la coincidencia con employee.company.
+
 - Los cuatro servicios de payroll exigen empresa guardada explicita; los calculos de empleado rechazan otra empresa antes de consultar datos.
 - ShiftForm y ManualTimeClockEntryForm no muestran ni aceptan empleados sin contexto de empresa, tambien al editar.
 - El servicio de fichajes abiertos exige un queryset de empleados explicito; no consulta toda la plataforma por omision.
@@ -185,7 +192,6 @@ Validaciones historicas relevantes:
 
 ## Invariantes Pendientes
 
-- `MonthlyHoursSummary.company` debe ser obligatorio.
 - `PayrollDraft.company` debe ser obligatorio salvo decision explicita de borradores globales.
 - `PayrollDraftLine.company` debe ser obligatorio y coincidir con `draft.company` y `employee.company`.
 - `Incident.shift.employee` debe coincidir con `Incident.employee`.
@@ -224,6 +230,7 @@ Validaciones historicas relevantes:
 - `fase-hardening-incident-company-not-null`: `Incident.company` obligatorio con migracion unica y admin tecnico ajustado.
 - `fase-hardening-timeclockentry-company-not-null`: empresa obligatoria en fichajes, guardas de migracion, validacion al guardar, formulario manual cerrado sin empresa y 154 tests OK; aplicada en base local nueva.
 - `fase-cierre-company-none-en-apis-internas`: formularios y servicios sin fallback global, llamadas worker explicitas y 161 tests OK.
+- `fase-hardening-monthlysummary-company-not-null`: migracion `payroll.0005`, validacion del modelo/admin y 165 tests OK.
 
 ## Hoja De Ruta Priorizada
 
@@ -397,7 +404,7 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 
 ## Deudas Pendientes Importantes
 
-- Ejecutar `fase-hardening-monthlysummary-company-not-null` antes de endurecer borradores y lineas.
+- Ejecutar `fase-hardening-payrolldraft-company-not-null` antes de endurecer lineas.
 - Endurecer payroll por fases: `MonthlyHoursSummary`, `PayrollDraft`, `PayrollDraftLine`.
 - Decidir cuando endurecer `workplace` a no nullable por modelo.
 - Mover configuracion QR/IP desde `BusinessConfig` global a `Workplace`.
@@ -455,3 +462,13 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - Formularios sin empresa fallan cerrado en altas y ediciones sin borrar company de la instancia existente. Pruebas de no escritura, aislamiento, empresas invalidas y pantalla de horas incluidas.
 - Tests relacionados: 95 OK; globales: 161 OK; check/makemigrations/diff: OK. No se han cambiado campos ni aplicado migraciones en esta fase.
 - Commit local: `fase-cierre-company-none-en-apis-internas`. Siguiente: MonthlyHoursSummary.company NOT NULL, con auditoria previa.
+
+## Cierre 2026-10-16 - Empresa Obligatoria En Resumenes Mensuales
+
+- Auditoria previa ORM: 0 resumenes, 0 null y 0 discrepancias con empleado. No se ha usado la auditoria historica como prueba del estado actual.
+- Modelo exige company y valida employee/company en cada save; admin muestra y permite seleccionar empresa.
+- Una migracion `payroll.0005` valida los datos sin modificarlos antes de imponer NOT NULL; depende de fichajes ya endurecidos.
+- Tests antiguos de backfill reconducidos a modelos/esquema historicos con MigrationExecutor. Se comprueba backfill y preservacion de summary/draft/line, rechazo de null y discrepancias antes del DDL, y restricciones del modelo y DB.
+- Tests relacionados: 69 OK; suite: 165 OK; check/makemigrations/diff OK. Copia local previa realizada; migracion aplicada y NOT NULL verificado en SQLite.
+- PayrollDraft y PayrollDraftLine siguen nullable hasta sus fases. No se han cambiado centros ni QR/IP ni templates.
+- Commit local: `fase-hardening-monthlysummary-company-not-null`. Siguiente: PayrollDraft.company NOT NULL.

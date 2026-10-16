@@ -1,9 +1,10 @@
 from datetime import date, time
 from decimal import Decimal
-from importlib import import_module
 
-from django.apps import apps
+from django.contrib import admin
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 
@@ -98,25 +99,26 @@ class MonthlySummaryTests(TestCase):
         self.assertEqual(draft.company, company)
         self.assertEqual(line.company, company)
 
-    def test_backfill_assigns_company_to_summary_draft_and_lines(self):
-        company = self.set_employee_company()
-        summary = MonthlyHoursSummary.objects.create(
-            employee=self.employee,
-            year=2026,
-            month=6,
-        )
-        draft = PayrollDraft.objects.create(year=2026, month=6, generated_by=self.user)
-        line = PayrollDraftLine.objects.create(draft=draft, employee=self.employee)
-        migration = import_module('payroll.migrations.0004_backfill_payroll_company')
+    def test_monthly_summary_requires_company_in_model_and_database(self):
+        summary = MonthlyHoursSummary(employee=self.employee, year=2026, month=6)
+        with self.assertRaises(ValidationError) as context:
+            summary.save()
+        self.assertIn('company', context.exception.message_dict)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            MonthlyHoursSummary.objects.bulk_create([summary])
 
-        migration.backfill_payroll_company(apps, None)
+    def test_monthly_summary_rejects_company_change_for_another_employee_company(self):
+        summary = calculate_employee_summary(self.employee, 2026, 6, company=self.company)
+        summary.company = Company.objects.create(name='Empresa B')
+        with self.assertRaises(ValidationError):
+            summary.save(update_fields=['company'])
         summary.refresh_from_db()
-        draft.refresh_from_db()
-        line.refresh_from_db()
+        self.assertEqual(summary.company, self.company)
 
-        self.assertEqual(summary.company, company)
-        self.assertEqual(draft.company, company)
-        self.assertEqual(line.company, company)
+    def test_monthly_summary_admin_exposes_company(self):
+        model_admin = admin.site._registry[MonthlyHoursSummary]
+        self.assertIn('company', model_admin.list_display)
+        self.assertIn('company', model_admin.autocomplete_fields)
 
     def test_recalculate_month_filters_by_company_when_provided(self):
         company = self.set_employee_company(name='Empresa A')
@@ -205,11 +207,6 @@ class MonthlySummaryTests(TestCase):
             company=other_company,
             year=2026,
             month=6,
-        )
-        MonthlyHoursSummary.objects.create(
-            employee=self.employee,
-            year=2026,
-            month=7,
         )
 
         self.assertEqual(list(monthly_summaries_for_company(company)), [summary])

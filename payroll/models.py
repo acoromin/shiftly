@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from employees.models import EmployeeProfile
@@ -11,8 +12,6 @@ class MonthlyHoursSummary(models.Model):
         on_delete=models.PROTECT,
         related_name='monthly_summaries',
         verbose_name='empresa',
-        blank=True,
-        null=True,
     )
     year = models.PositiveSmallIntegerField('año')
     month = models.PositiveSmallIntegerField('mes')
@@ -37,6 +36,14 @@ class MonthlyHoursSummary(models.Model):
 
     def __str__(self):
         return f'{self.employee} · {self.month:02d}/{self.year}'
+
+    def clean(self):
+        if self.company_id and self.employee_id and self.employee.company_id != self.company_id:
+            raise ValidationError({'employee': 'El empleado debe pertenecer a la empresa del resumen.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class PayrollDraft(models.Model):

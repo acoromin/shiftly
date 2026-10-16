@@ -9,12 +9,14 @@ class MonthlyHoursSummaryAdmin(admin.ModelAdmin):
         'year',
         'month',
         'employee',
+        'company',
         'planned_hours',
         'valid_clocked_hours',
         'detected_overtime_hours',
         'pending_incidents_count',
     )
-    list_filter = ('year', 'month')
+    list_filter = ('company', 'year', 'month')
+    autocomplete_fields = ('company', 'employee')
     search_fields = ('employee__full_name', 'observations')
     readonly_fields = ('calculated_at',)
 
