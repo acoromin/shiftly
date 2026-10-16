@@ -67,11 +67,11 @@ class MonthlySummaryTests(TestCase):
     def test_summary_does_not_include_legacy_data_from_other_company(self):
         other_company = Company.objects.create(name='Empresa B')
         # Deliberately inconsistent historical rows must never enter the calculation.
-        LeaveRequest.objects.create(
+        LeaveRequest.objects.bulk_create([LeaveRequest(
             employee=self.employee, company=other_company,
             request_type=LeaveRequest.RequestType.VACATION, status=LeaveRequest.Status.APPROVED,
             start_date=date(2026, 6, 3), end_date=date(2026, 6, 4),
-        )
+        )])
         summary = calculate_employee_summary(self.employee, 2026, 6, company=self.company)
         self.assertEqual(summary.approved_vacation_days, 0)
 
@@ -384,14 +384,14 @@ class MonthlySummaryTests(TestCase):
             start_date=date(2026, 6, 3),
             end_date=date(2026, 6, 4),
         )
-        LeaveRequest.objects.create(
+        LeaveRequest.objects.bulk_create([LeaveRequest(
             employee=self.employee,
             company=other_company,
             request_type=LeaveRequest.RequestType.DAY_OFF,
             status=LeaveRequest.Status.APPROVED,
             start_date=date(2026, 6, 5),
             end_date=date(2026, 6, 5),
-        )
+        )])
         Incident.objects.create(
             employee=self.employee,
             company=company,
@@ -400,14 +400,14 @@ class MonthlySummaryTests(TestCase):
             description='Incidencia de empresa.',
             created_by=self.user,
         )
-        Incident.objects.create(
+        Incident.objects.bulk_create([Incident(
             employee=self.employee,
             company=other_company,
             date=date(2026, 6, 7),
             incident_type=Incident.IncidentType.OTHER,
             description='Incidencia de otra empresa.',
             created_by=self.user,
-        )
+        )])
 
         summary = calculate_employee_summary(self.employee, 2026, 6, company=company)
 

@@ -76,6 +76,14 @@ class EmployeeProfile(models.Model):
 
     def clean(self):
         errors = {}
+        if self.pk and self.company_id and type(self).objects.filter(pk=self.pk).exclude(company_id=self.company_id).exists():
+            history = (
+                self.shifts, self.timeclock_entries, self.leave_requests, self.incidents,
+                self.monthly_summaries, self.payroll_draft_lines,
+                self.user.reviewed_leave_requests, self.user.resolved_incidents,
+            )
+            if any(records.exists() for records in history):
+                errors['company'] = 'No se puede cambiar la empresa de un empleado con historico operativo.'
         if self.primary_workplace_id and not self.company_id:
             errors['company'] = 'Indica la empresa para asignar un centro principal.'
         elif (
@@ -86,6 +94,10 @@ class EmployeeProfile(models.Model):
             errors['primary_workplace'] = 'El centro principal debe pertenecer a la misma empresa.'
         if errors:
             raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     @property
     def is_admin(self):

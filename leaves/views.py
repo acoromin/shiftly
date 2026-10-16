@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 
 from employees.permissions import is_admin_without_company, is_company_admin_profile
@@ -122,12 +122,12 @@ def review_request(request, pk, status):
 
     form = LeaveReviewForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        leave_request.review(
-            status=status,
-            user=request.user,
-            comment=form.cleaned_data['admin_comment'],
-        )
-        messages.success(request, 'Solicitud revisada correctamente.')
+        try:
+            leave_request.review(status=status, user=request.user, comment=form.cleaned_data['admin_comment'])
+        except ValidationError as error:
+            messages.error(request, ' '.join(error.messages))
+        else:
+            messages.success(request, 'Solicitud revisada correctamente.')
         return redirect('leaves:list')
 
     return render(

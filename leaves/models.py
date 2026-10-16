@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from employees.models import EmployeeProfile
@@ -67,6 +67,10 @@ class LeaveRequest(models.Model):
             and self.employee.company_id != self.company_id
         ):
             errors['employee'] = 'El empleado debe pertenecer a la misma empresa que la solicitud.'
+        if self.reviewed_by_id and self.company_id:
+            reviewer = getattr(self.reviewed_by, 'employee_profile', None)
+            if reviewer and reviewer.company_id != self.company_id:
+                errors['reviewed_by'] = 'El revisor debe pertenecer a la misma empresa que la solicitud.'
         if self.employee_id and self.start_date and self.end_date:
             overlapping = LeaveRequest.objects.filter(
                 employee=self.employee,
@@ -81,9 +85,17 @@ class LeaveRequest(models.Model):
         if errors:
             raise ValidationError(errors)
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @transaction.atomic
     def review(self, *, status, user, comment=''):
         if status not in {self.Status.APPROVED, self.Status.REJECTED}:
             raise ValueError('Estado de revisión no válido.')
+        current = type(self).objects.select_for_update().get(pk=self.pk)
+        if current.status != self.Status.PENDING:
+            raise ValidationError('Solo se pueden revisar solicitudes pendientes.')
         self.status = status
         self.reviewed_by = user
         self.admin_comment = comment

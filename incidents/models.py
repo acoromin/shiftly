@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from employees.models import EmployeeProfile
@@ -95,12 +95,28 @@ class Incident(models.Model):
             and self.timeclock_entry.company_id != self.company_id
         ):
             errors['timeclock_entry'] = 'El fichaje debe pertenecer a la misma empresa que la incidencia.'
+        if self.shift_id and self.employee_id and self.shift.employee_id != self.employee_id:
+            errors['shift'] = 'El turno debe pertenecer al mismo empleado que la incidencia.'
+        if self.timeclock_entry_id and self.employee_id and self.timeclock_entry.employee_id != self.employee_id:
+            errors['timeclock_entry'] = 'El fichaje debe pertenecer al mismo empleado que la incidencia.'
+        if self.resolved_by_id and self.company_id:
+            resolver = getattr(self.resolved_by, 'employee_profile', None)
+            if resolver and resolver.company_id != self.company_id:
+                errors['resolved_by'] = 'El resolutor debe pertenecer a la misma empresa que la incidencia.'
         if errors:
             raise ValidationError(errors)
 
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    @transaction.atomic
     def resolve(self, *, status, user, comment=''):
         if status not in {self.Status.APPROVED, self.Status.REJECTED, self.Status.RESOLVED}:
             raise ValueError('Estado de resolución no válido.')
+        current = type(self).objects.select_for_update().get(pk=self.pk)
+        if current.status != self.Status.PENDING:
+            raise ValidationError('Solo se pueden resolver incidencias pendientes.')
         self.status = status
         self.resolved_by = user
         self.resolved_at = timezone.now()

@@ -19,16 +19,16 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Fase cerrada: `fase-hardening-payrolldraftline-company-not-null` (fase 5), con migracion local aplicada.
-- Siguiente fase: `fase-integridad-relaciones-operativas` (fase 6).
-- Auditar relaciones empleado/turno/fichaje, empresas de revisores y resolutores, y posibles cambios de empresa que desplacen historico antes de imponer nuevas reglas.
-- Proteger modelos/formularios y acciones de revision/resolucion, comprobar casos negativos y suite completa; documentar y cerrar antes de continuar.
-- No adelantar admin por empresa ni workplace/QR/IP/diseno antes de cerrar esta fase.
+- Fase cerrada: `fase-integridad-relaciones-operativas` (fase 6), sin migracion nueva.
+- Siguiente fase: `fase-admin-tenant-scope` (fase 7).
+- Auditar acceso de staff/superusers al admin, elegir aislamiento por empresa o reserva a superuser tecnico, y probar listado/detalle/escrituras/autocompletado.
+- Mantener acceso operativo del administrador de empresa desde las vistas de cliente; no habilitar un panel global para staff sin contexto.
+- No adelantar workplace/QR/IP ni auditoria de logs antes de cerrar la fase 7.
 - La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias.
 
 ## Estado Actual Del Proyecto
 
-- Fase cerrada: `fase-hardening-payrolldraftline-company-not-null`; 176 tests OK y migracion local aplicada. Baseline anterior: `c48f661` (borradores con empresa obligatoria).
+- Fase cerrada: `fase-integridad-relaciones-operativas`; 185 tests OK. Baseline anterior: `fd0487c` (lineas de payroll).
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
 - Cada fase cerrada dispone de su commit local con codigo, tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
@@ -48,6 +48,8 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - `docs/hardening-company-not-null-plan.md` es plan historico de la primera etapa; la fuente viva es este archivo.
 
 ## Ultima Auditoria De Datos
+
+Auditoria ORM local 2026-10-16 antes de fase 6: Incident total 0, LeaveRequest total 0; diferencias de empresa con empleados, turno y fichaje 0; turno/empleado e incidencia/fichaje/empleado 0; empresa de revisor/resolutor 0; centro/empresa del empleado 0. Sin saneamiento ni cambio de esquema.
 
 Auditoria ORM local 2026-10-16 previa a `payroll.0007`: lineas total 0, company=NULL 0, mismatch empleado/empresa 0 y borrador/empresa 0. Copia: `backups/shiftly-pre-payrollline-20261016-214723.sqlite3`. NOT NULL confirmado en las tres tablas de payroll.
 
@@ -83,6 +85,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Fase `fase-integridad-relaciones-operativas`, 2026-10-16: tests `employees leaves incidents payroll timeclock dashboard` 129 OK, nuevos tests `core.test_integrity` 9 OK; suite completa 185 OK; check/makemigrations/diff OK. Sin migraciones nuevas.
 
 Fase `fase-hardening-payrolldraftline-company-not-null`, 2026-10-16: tests `payroll reports` 34 OK; suite global 176 OK; check/makemigrations/diff OK; `payroll.0007` aplicada e introspeccion NOT NULL de las tres tablas OK.
 
@@ -180,6 +184,11 @@ Validaciones historicas relevantes:
 
 ## Invariantes Cerradas
 
+- Incidencias solo se enlazan a turnos/fichajes del mismo empleado y empresa; save() valida los datos.
+- Revisores y resolutores con perfil pertenecen a la empresa del registro. El tecnico sin perfil puede operar desde herramientas autorizadas.
+- review()/resolve() bloquean la fila y comprueban que sigue pendiente antes de actuar; rechazan instancias obsoletas y revisiones repetidas. Las vistas devuelven mensajes de error sin sobrescribir datos.
+- EmployeeProfile.company solo puede cambiar mientras no exista historial operativo propio o de revision/resolucion; save() valida el perfil y protege ese historial.
+
 - PayrollDraftLine exige empresa en modelo y DB, coincidente con empleado y borrador. Admin inline muestra company de solo lectura y no permite altas manuales incompletas.
 
 - PayrollDraft exige empresa en modelo y DB y rechaza cambios de empresa incompatibles con sus lineas/empleados. Los borradores vacios con empresa conocida siguen siendo validos.
@@ -205,10 +214,6 @@ Validaciones historicas relevantes:
 
 ## Invariantes Pendientes
 
-- `Incident.shift.employee` debe coincidir con `Incident.employee`.
-- `Incident.timeclock_entry.employee` debe coincidir con `Incident.employee`.
-- `LeaveRequest.reviewed_by` e `Incident.resolved_by` deberian validarse contra la misma empresa cuando exista perfil.
-- `EmployeeProfile.company` es mutable y podria mover historico; falta decidir si bloquear cambios o modelar historial.
 - `workplace` todavia no es una invariante fuerte.
 - QR/IP por fichaje siguen en `BusinessConfig` global y deben moverse a `Workplace` en una fase posterior.
 - Django Admin no esta filtrado por tenant.
@@ -244,6 +249,7 @@ Validaciones historicas relevantes:
 - `fase-hardening-monthlysummary-company-not-null`: migracion `payroll.0005`, validacion del modelo/admin y 165 tests OK.
 - `fase-hardening-payrolldraft-company-not-null`: migracion `payroll.0006`, validacion al guardar y 170 tests OK.
 - `fase-hardening-payrolldraftline-company-not-null`: migracion `payroll.0007`, coherencia de las lineas y 176 tests OK.
+- `fase-integridad-relaciones-operativas`: relaciones y cambios de empresa protegidos, acciones pendientes verificadas y 185 tests OK.
 
 ## Hoja De Ruta Priorizada
 
@@ -417,7 +423,7 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 
 ## Deudas Pendientes Importantes
 
-- Ejecutar `fase-integridad-relaciones-operativas`.
+- Ejecutar `fase-admin-tenant-scope`.
 - Decidir cuando endurecer `workplace` a no nullable por modelo.
 - Mover configuracion QR/IP desde `BusinessConfig` global a `Workplace`.
 - Decidir si hace falta panel operativo global interno para staff/superuser y como evitar que cree datos con `company=NULL`.
@@ -503,3 +509,14 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - Tests historicos comprueban preservacion de horas, observaciones, empleado y borrador, y rechazo de cada inconsistencia antes del DDL. Tests actuales cubren modelo, DB y POST real del admin con intento de cambio de empresa: devuelve errores, no 500, y conserva datos.
 - Tests relacionados: 34 OK; globales: 176 OK; check/makemigrations/diff OK. Copia previa realizada, migracion aplicada y NOT NULL confirmado en las tres tablas de payroll.
 - Commit local: `fase-hardening-payrolldraftline-company-not-null`. Siguiente: integridad de relaciones operativas.
+
+## Cierre 2026-10-16 - Integridad De Relaciones Operativas
+
+- Auditoria previa ORM local sin relaciones cruzadas ni datos que sanear. No se ha modificado el esquema.
+- Incident valida empleado de turno/fichaje; Incident y LeaveRequest validan empresa del resolutor/revisor cuando existe perfil y ejecutan full_clean() al guardar.
+- review()/resolve() leen el estado persistido con select_for_update dentro de una transaccion. Rechazan registros ya procesados/cancelados o instancias obsoletas. Las vistas muestran ValidationError sin 500 ni escrituras parciales. En SQLite select_for_update no aporta bloqueo de fila; la prueba acredita rechazo de instancias obsoletas, no concurrencia real entre procesos.
+- Decidido proteger historico al cambiar EmployeeProfile.company: se permite antes de actividad; se bloquea con turnos, fichajes, solicitudes, incidencias, resumenes, lineas o acciones de revision/resolucion. No se ha modelado traslado de historico entre empresas.
+- Estados aprobados importados sin revisor siguen representables: no se exige completar datos historicos no disponibles. La transicion por API si exige estado pendiente y guarda actor/fecha.
+- Tests de payroll que simulan datos historicos corruptos usan bulk_create de forma explicita; las rutas normales de guardado ya rechazan esas discrepancias.
+- Tests existentes relacionados: 129 OK; nuevos de integridad: 9 OK; suite global: 185 OK; check/makemigrations/diff OK. Se corrigio la carga del POST de una prueba nueva para enviar un formulario vinculado antes de la regresion completa.
+- Commit local: `fase-integridad-relaciones-operativas`. Siguiente: aislamiento de Django Admin.
