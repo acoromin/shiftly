@@ -26,6 +26,7 @@ class PayrollDraftLineInline(admin.TabularInline):
     extra = 0
     readonly_fields = (
         'employee',
+        'company',
         'contracted_hours',
         'planned_hours',
         'valid_clocked_hours',
@@ -39,6 +40,9 @@ class PayrollDraftLineInline(admin.TabularInline):
         'observations',
     )
     can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PayrollDraft)

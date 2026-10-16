@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from companies.models import Company
@@ -140,6 +141,56 @@ class MonthlySummaryTests(TestCase):
         model_admin = admin.site._registry[PayrollDraft]
         self.assertIn('company', model_admin.list_display)
         self.assertIn('company', model_admin.autocomplete_fields)
+
+    def test_payroll_line_requires_company_in_model_and_database(self):
+        draft = PayrollDraft.objects.create(year=2026, month=6, company=self.company, generated_by=self.user)
+        line = PayrollDraftLine(employee=self.employee, draft=draft)
+        with self.assertRaises(ValidationError) as context:
+            line.save()
+        self.assertIn('company', context.exception.message_dict)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            PayrollDraftLine.objects.bulk_create([line])
+
+    def test_payroll_line_rejects_mismatched_employee_and_draft(self):
+        other_company = Company.objects.create(name='Empresa B')
+        draft = PayrollDraft.objects.create(year=2026, month=6, company=self.company, generated_by=self.user)
+        other_draft = PayrollDraft.objects.create(year=2026, month=6, company=other_company, generated_by=self.user)
+        for company, related_draft in ((other_company, draft), (self.company, other_draft)):
+            with self.subTest(company=company):
+                line = PayrollDraftLine(employee=self.employee, company=company, draft=related_draft)
+                with self.assertRaises(ValidationError):
+                    line.save()
+        self.assertFalse(PayrollDraftLine.objects.exists())
+
+    def test_payroll_line_rejects_company_change(self):
+        draft = generate_payroll_draft(2026, 6, self.user, company=self.company)
+        line = draft.lines.get()
+        line.company = Company.objects.create(name='Empresa B')
+        with self.assertRaises(ValidationError):
+            line.save(update_fields=['company'])
+        line.refresh_from_db()
+        self.assertEqual(line.company, self.company)
+
+    def test_admin_rejects_draft_company_change_with_inline_without_server_error(self):
+        draft = generate_payroll_draft(2026, 6, self.user, company=self.company)
+        line = draft.lines.get()
+        other_company = Company.objects.create(name='Empresa B')
+        self.user.is_staff = self.user.is_superuser = True
+        self.user.save(update_fields=['is_staff', 'is_superuser'])
+        self.client.force_login(self.user)
+        response = self.client.post(reverse('admin:payroll_payrolldraft_change', args=[draft.pk]), {
+            'year': 2026, 'month': 6, 'company': other_company.pk,
+            'status': PayrollDraft.Status.DRAFT, 'generated_by': self.user.pk,
+            'lines-TOTAL_FORMS': 1, 'lines-INITIAL_FORMS': 1,
+            'lines-MIN_NUM_FORMS': 0, 'lines-MAX_NUM_FORMS': 1000,
+            'lines-0-id': line.pk, 'lines-0-draft': draft.pk, '_save': 'Guardar',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'La empresa del borrador debe coincidir')
+        draft.refresh_from_db()
+        line.refresh_from_db()
+        self.assertEqual(draft.company, self.company)
+        self.assertEqual(line.company, self.company)
 
     def test_recalculate_month_filters_by_company_when_provided(self):
         company = self.set_employee_company(name='Empresa A')

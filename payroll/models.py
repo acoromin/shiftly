@@ -98,8 +98,6 @@ class PayrollDraftLine(models.Model):
         on_delete=models.PROTECT,
         related_name='payroll_draft_lines',
         verbose_name='empresa',
-        blank=True,
-        null=True,
     )
     contracted_hours = models.DecimalField('horas contratadas', max_digits=7, decimal_places=2, default=0)
     planned_hours = models.DecimalField('horas planificadas', max_digits=7, decimal_places=2, default=0)
@@ -121,4 +119,14 @@ class PayrollDraftLine(models.Model):
     def __str__(self):
         return f'{self.employee} · {self.draft}'
 
-# Create your models here.
+    def clean(self):
+        if self.company_id:
+            if self.employee_id and self.employee.company_id != self.company_id:
+                raise ValidationError('La empresa de la linea debe coincidir con la del empleado.')
+            if self.draft_id and self.draft.company_id != self.company_id:
+                # Non-field errors also work in the admin inline, where draft is excluded.
+                raise ValidationError('La empresa de la linea debe coincidir con la del borrador.')
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)

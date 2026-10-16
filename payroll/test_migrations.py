@@ -104,3 +104,39 @@ class PayrollDraftCompanyMigrationTests(PayrollMigrationTestCase):
         draft.save()
         self.assert_migration_blocked('employee_draft_company_mismatch=1')
         self.assertTrue(self.company_nullable(self.Draft))
+
+
+class PayrollLineCompanyMigrationTests(PayrollMigrationTestCase):
+    migrate_from = ('payroll', '0006_alter_payrolldraft_company')
+    migrate_to = ('payroll', '0007_alter_payrolldraftline_company')
+
+    def test_migration_preserves_line_values_and_relations(self):
+        draft = self.Draft.objects.create(year=2026, month=6, company=self.company, generated_by=self.user)
+        line = self.Line.objects.create(
+            draft=draft, employee=self.employee, company=self.company,
+            valid_clocked_hours='123.45', observations='Mantener historial',
+        )
+        MigrationExecutor(connection).migrate([self.migrate_to])
+        line.refresh_from_db()
+        self.assertEqual(str(line.valid_clocked_hours), '123.45')
+        self.assertEqual(line.observations, 'Mantener historial')
+        self.assertEqual(line.draft_id, draft.pk)
+        self.assertEqual(line.employee_id, self.employee.pk)
+        self.assertEqual(line.company_id, self.company.pk)
+        for model in (self.Summary, self.Draft, self.Line):
+            self.assertFalse(self.company_nullable(model))
+
+    def test_migration_blocks_null_employee_and_draft_company_mismatches(self):
+        draft = self.Draft.objects.create(year=2026, month=6, company=self.company, generated_by=self.user)
+        other_draft = self.Draft.objects.create(year=2026, month=6, company=self.other_company, generated_by=self.user)
+        cases = (
+            (None, draft, 'company_null=1'),
+            (self.other_company, draft, 'employee_company_mismatch=1'),
+            (self.company, other_draft, 'draft_company_mismatch=1'),
+        )
+        for company, related_draft, message in cases:
+            with self.subTest(message=message):
+                line = self.Line.objects.create(draft=related_draft, employee=self.employee, company=company)
+                self.assert_migration_blocked(message)
+                self.assertTrue(self.company_nullable(self.Line))
+                line.delete()
