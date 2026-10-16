@@ -20,7 +20,8 @@ class ManualTimeClockEntryForm(forms.ModelForm):
         self.fields['employee'].queryset = active_employees_for_company(company)
         # company is intentionally excluded from the customer-facing form.
         # Set it before ModelForm runs the model's cross-company validation.
-        self.instance.company = company
+        if company is not None:
+            self.instance.company = company
         self.fields['timestamp'].initial = timezone.localtime().strftime('%Y-%m-%dT%H:%M')
         for field in self.fields.values():
             current_class = field.widget.attrs.get('class', '')

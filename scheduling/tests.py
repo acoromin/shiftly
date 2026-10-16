@@ -365,6 +365,27 @@ class ShiftTests(TestCase):
         self.assertIn(self.employee, employees)
         self.assertNotIn(other, employees)
 
+    def test_shift_form_without_company_rejects_employee_on_create_and_edit(self):
+        company, workplace = self.set_employee_context()
+        shift = Shift.objects.create(
+            employee=self.employee, company=company, workplace=workplace,
+            date=date(2026, 6, 23), start_time=time(8), end_time=time(16),
+        )
+        data = {
+            'employee': self.employee.pk, 'date': '2026-06-24',
+            'start_time': '08:00', 'end_time': '16:00',
+            'planned_break_minutes': '0', 'position': Shift.Position.WAITER,
+        }
+        for kwargs in ({}, {'company': None}, {'instance': shift}):
+            with self.subTest(kwargs=kwargs):
+                form = ShiftForm(data, **kwargs)
+                self.assertFalse(form.fields['employee'].queryset.exists())
+                self.assertFalse(form.is_valid())
+                self.assertIn('employee', form.errors)
+        shift.refresh_from_db()
+        self.assertEqual(shift.company, company)
+        self.assertEqual(shift.date, date(2026, 6, 23))
+
     def test_shift_form_with_company_rejects_other_company_employee(self):
         company, _workplace = self.set_employee_context()
         other_company = Company.objects.create(name='Empresa B')

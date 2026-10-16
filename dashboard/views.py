@@ -117,7 +117,7 @@ def index(request):
             and current_entry.entry_type == TimeClockEntry.EntryType.IN
             and timezone.now() - current_entry.timestamp <= timedelta(hours=18)
         )
-        month_summary = calculate_employee_summary(profile, today.year, today.month)
+        month_summary = calculate_employee_summary(profile, today.year, today.month, company=profile.company)
         own_pending_leaves = LeaveRequest.objects.filter(
             employee=profile,
             status=LeaveRequest.Status.PENDING,

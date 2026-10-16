@@ -16,7 +16,7 @@ from timeclock.models import TimeClockEntry
 
 from .models import MonthlyHoursSummary, PayrollDraft, PayrollDraftLine
 from .selectors import monthly_summaries_for_company
-from .services import calculate_employee_summary, generate_payroll_draft, recalculate_month
+from .services import calculate_clocked_hours, calculate_employee_summary, generate_payroll_draft, month_bounds, recalculate_month
 
 
 class MonthlySummaryTests(TestCase):
@@ -37,6 +37,41 @@ class MonthlySummaryTests(TestCase):
         employee.company = company
         employee.save(update_fields=['company'])
         return company
+
+    def test_payroll_services_require_company_and_do_not_create_data(self):
+        _, _, start, end = month_bounds(2026, 6)
+        calls = (
+            lambda **kwargs: calculate_clocked_hours(self.employee, start, end, **kwargs),
+            lambda **kwargs: calculate_employee_summary(self.employee, 2026, 6, **kwargs),
+            lambda **kwargs: recalculate_month(2026, 6, **kwargs),
+            lambda **kwargs: generate_payroll_draft(2026, 6, self.user, **kwargs),
+        )
+        for call in calls:
+            for kwargs in ({}, {'company': None}, {'company': Company(name='Sin guardar')}):
+                with self.subTest(call=call, kwargs=kwargs), self.assertRaises(ValueError):
+                    call(**kwargs)
+        self.assertFalse(MonthlyHoursSummary.objects.exists())
+        self.assertFalse(PayrollDraft.objects.exists())
+        self.assertFalse(PayrollDraftLine.objects.exists())
+
+    def test_employee_calculations_reject_other_company_before_queries(self):
+        other_company = Company.objects.create(name='Empresa B')
+        _, _, start, end = month_bounds(2026, 6)
+        with self.assertNumQueries(0), self.assertRaises(ValueError):
+            calculate_employee_summary(self.employee, 2026, 6, company=other_company)
+        with self.assertNumQueries(0), self.assertRaises(ValueError):
+            calculate_clocked_hours(self.employee, start, end, company=other_company)
+
+    def test_summary_does_not_include_legacy_data_from_other_company(self):
+        other_company = Company.objects.create(name='Empresa B')
+        # Deliberately inconsistent historical rows must never enter the calculation.
+        LeaveRequest.objects.create(
+            employee=self.employee, company=other_company,
+            request_type=LeaveRequest.RequestType.VACATION, status=LeaveRequest.Status.APPROVED,
+            start_date=date(2026, 6, 3), end_date=date(2026, 6, 4),
+        )
+        summary = calculate_employee_summary(self.employee, 2026, 6, company=self.company)
+        self.assertEqual(summary.approved_vacation_days, 0)
 
     def test_payroll_models_can_reference_company(self):
         company = self.set_employee_company()
@@ -206,7 +241,7 @@ class MonthlySummaryTests(TestCase):
             created_by=self.user,
         )
 
-        summary = calculate_employee_summary(self.employee, 2026, 6)
+        summary = calculate_employee_summary(self.employee, 2026, 6, company=company)
 
         self.assertEqual(summary.planned_hours, Decimal('8.00'))
         self.assertEqual(summary.valid_clocked_hours, Decimal('8.50'))

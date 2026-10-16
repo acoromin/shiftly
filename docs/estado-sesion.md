@@ -19,16 +19,16 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Fase cerrada en esta copia: `fase-hardening-timeclockentry-company-not-null` (codigo, migracion local, tests y documentacion).
-- Siguiente fase tecnica: `fase-cierre-company-none-en-apis-internas` (fase 2 de la hoja de ruta), antes de endurecer payroll.
-- Comprobar primero `git status --short` y `./.venv/bin/python manage.py migrate --plan`.
-- Auditar formularios/servicios reutilizables de `scheduling/forms.py`, `timeclock/forms.py` y `payroll/services.py`: sin empresa deben fallar cerrado o usar una API tecnica global explicita. El formulario manual de fichajes ya esta cerrado.
-- No adelantar las fases NOT NULL de payroll, workplace, QR/IP por centro ni cambios visuales.
-- La base local se ha creado nueva en esta sesion y no contiene fichajes. Si se recupera la base original, hacer copia y repetir la auditoria antes de aplicar migraciones; la validacion local no acredita sus datos.
+- Fase cerrada: `fase-cierre-company-none-en-apis-internas` (fase 2).
+- Siguiente fase: `fase-hardening-monthlysummary-company-not-null` (fase 3).
+- Auditar por ORM los resumenes sin empresa o con empresa distinta del empleado antes de cambiar el esquema.
+- Proteger modelo/admin y actualizar tests legacy; despues crear una unica migracion de MonthlyHoursSummary, pasar tests relacionados y suite completa, aplicar y documentar.
+- No adelantar PayrollDraft/PayrollDraftLine ni workplace/QR/IP/diseno antes de cerrar esta fase.
+- La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias.
 
 ## Estado Actual Del Proyecto
 
-- Fase cerrada en esta copia: `fase-hardening-timeclockentry-company-not-null`; validada con Django, migracion aplicada en base local nueva y suite completa en verde.
+- Fase cerrada: `fase-cierre-company-none-en-apis-internas`; 161 tests OK. Baseline anterior: `7bd6a75` (fichajes con empresa obligatoria).
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
 - El commit de cierre de esta fase incluye los cambios de fichajes, sus tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
@@ -75,6 +75,11 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Fase `fase-cierre-company-none-en-apis-internas`, 2026-10-16:
+
+- Tests `scheduling timeclock payroll reports dashboard`: 95 OK; suite completa: 161 OK.
+- `check`, `makemigrations --check --dry-run`, `git diff --check`: OK; sin migracion nueva.
 
 Fase `fase-hardening-timeclockentry-company-not-null`, 2026-10-16:
 
@@ -161,6 +166,10 @@ Validaciones historicas relevantes:
 
 ## Invariantes Cerradas
 
+- Los cuatro servicios de payroll exigen empresa guardada explicita; los calculos de empleado rechazan otra empresa antes de consultar datos.
+- ShiftForm y ManualTimeClockEntryForm no muestran ni aceptan empleados sin contexto de empresa, tambien al editar.
+- El servicio de fichajes abiertos exige un queryset de empleados explicito; no consulta toda la plataforma por omision.
+
 - Admin con `company` mantiene gestion operativa limitada a su empresa.
 - Admin sin `company` ya no puede usar paneles operativos de cliente.
 - Trabajadores mantienen comportamiento propio.
@@ -214,6 +223,7 @@ Validaciones historicas relevantes:
 - `fase-hardening-leaverequest-company-not-null`: `LeaveRequest.company` obligatorio con migracion unica y admin tecnico ajustado.
 - `fase-hardening-incident-company-not-null`: `Incident.company` obligatorio con migracion unica y admin tecnico ajustado.
 - `fase-hardening-timeclockentry-company-not-null`: empresa obligatoria en fichajes, guardas de migracion, validacion al guardar, formulario manual cerrado sin empresa y 154 tests OK; aplicada en base local nueva.
+- `fase-cierre-company-none-en-apis-internas`: formularios y servicios sin fallback global, llamadas worker explicitas y 161 tests OK.
 
 ## Hoja De Ruta Priorizada
 
@@ -387,9 +397,8 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 
 ## Deudas Pendientes Importantes
 
-- Ejecutar `fase-cierre-company-none-en-apis-internas` antes de endurecer payroll.
+- Ejecutar `fase-hardening-monthlysummary-company-not-null` antes de endurecer borradores y lineas.
 - Endurecer payroll por fases: `MonthlyHoursSummary`, `PayrollDraft`, `PayrollDraftLine`.
-- Cerrar `company=None` en APIs internas y formularios reutilizables.
 - Decidir cuando endurecer `workplace` a no nullable por modelo.
 - Mover configuracion QR/IP desde `BusinessConfig` global a `Workplace`.
 - Decidir si hace falta panel operativo global interno para staff/superuser y como evitar que cree datos con `company=NULL`.
@@ -437,3 +446,12 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - Fase cerrada para el codigo y el entorno local disponible. No se ha accedido a la base original ni se ha acreditado su estado; si aparece, hacer copia y auditar antes de migrar.
 - Commit local de cierre: mensaje `fase-hardening-timeclockentry-company-not-null`; sin push.
 - Siguiente fase: `fase-cierre-company-none-en-apis-internas`. No se ha implementado ninguna fase posterior.
+
+## Cierre 2026-10-16 - APIs Internas Sin Empresa
+
+- Auditadas todas las llamadas a ShiftForm, formulario manual y servicios de calculo/generacion de payroll. Reportes ya pasaban empresa; dashboard del trabajador y pagina de horas ahora tambien la pasan.
+- Payroll rechaza empresa omitida, None, sin guardar o empleado de otra empresa. Todas las consultas de resumen/horas filtran empresa incondicionalmente. No hay API global implicita.
+- Eliminado el fallback global de empleados en ShiftForm y del servicio employees_with_open_clock_entries. La auditoria detecto este ultimo fuera de los tres archivos inicialmente previstos; su unico llamador ya pasa un queryset autorizado.
+- Formularios sin empresa fallan cerrado en altas y ediciones sin borrar company de la instancia existente. Pruebas de no escritura, aislamiento, empresas invalidas y pantalla de horas incluidas.
+- Tests relacionados: 95 OK; globales: 161 OK; check/makemigrations/diff: OK. No se han cambiado campos ni aplicado migraciones en esta fase.
+- Commit local: `fase-cierre-company-none-en-apis-internas`. Siguiente: MonthlyHoursSummary.company NOT NULL, con auditoria previa.

@@ -114,7 +114,7 @@ def hours(request):
         year, month = today.year, today.month
     if month < 1 or month > 12:
         month = today.month
-    summary = calculate_employee_summary(profile, year, month)
+    summary = calculate_employee_summary(profile, year, month, company=profile.company)
     return render(
         request,
         'timeclock/hours.html',

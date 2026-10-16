@@ -38,9 +38,7 @@ def last_valid_entry(employee):
 
 def employees_with_open_clock_entries(employee_queryset=None):
     if employee_queryset is None:
-        from employees.models import EmployeeProfile
-
-        employee_queryset = EmployeeProfile.objects.filter(is_active=True)
+        raise ValueError('Indica el queryset de empleados autorizado para consultar fichajes abiertos.')
     open_entries = []
     for employee in employee_queryset:
         entry = last_valid_entry(employee)

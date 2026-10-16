@@ -17,7 +17,7 @@ from scheduling.models import Shift
 from .forms import ManualTimeClockEntryForm
 from .models import TimeClockEntry
 from .selectors import timeclock_entries_for_company, timeclock_entries_for_employee
-from .services import attempt_clock, ensure_missing_clock_incident, resolve_timeclock_entry_context
+from .services import attempt_clock, employees_with_open_clock_entries, ensure_missing_clock_incident, resolve_timeclock_entry_context
 
 
 class TimeClockTests(TestCase):
@@ -57,6 +57,36 @@ class TimeClockTests(TestCase):
 
         self.assertEqual(context['company'], company)
         self.assertEqual(context['workplace'], workplace)
+
+    def test_open_clock_entries_require_explicit_employee_scope(self):
+        with self.assertNumQueries(0), self.assertRaises(ValueError):
+            employees_with_open_clock_entries()
+        with self.assertNumQueries(0), self.assertRaises(ValueError):
+            employees_with_open_clock_entries(None)
+        self.assertEqual(employees_with_open_clock_entries(EmployeeProfile.objects.none()), [])
+
+    def test_manual_form_without_company_rejects_edit_without_clearing_existing_company(self):
+        company, workplace = self.set_employee_context()
+        entry = TimeClockEntry.objects.create(
+            employee=self.employee, company=company, workplace=workplace,
+            entry_type=TimeClockEntry.EntryType.IN, timestamp=timezone.now(), created_by=self.user,
+        )
+        form = ManualTimeClockEntryForm({
+            'employee': self.employee.pk, 'entry_type': TimeClockEntry.EntryType.OUT,
+            'timestamp': timezone.localtime().strftime('%Y-%m-%dT%H:%M'),
+            'manual_reason': 'Correccion sin contexto.',
+        }, instance=entry)
+        self.assertFalse(form.is_valid())
+        self.assertIn('employee', form.errors)
+        entry.refresh_from_db()
+        self.assertEqual(entry.company, company)
+        self.assertEqual(entry.entry_type, TimeClockEntry.EntryType.IN)
+
+    def test_worker_hours_page_passes_company_to_summary(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('timeclock:hours') + '?year=2026&month=6')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['summary'].company, self.company)
 
     def test_valid_clock_saves_company_and_employee_primary_workplace(self):
         company, workplace = self.set_employee_context()

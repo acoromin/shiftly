@@ -1,6 +1,5 @@
 from django import forms
 
-from employees.models import EmployeeProfile
 from employees.selectors import active_employees_for_company
 
 from .models import Shift
@@ -27,11 +26,9 @@ class ShiftForm(forms.ModelForm):
 
     def __init__(self, *args, company=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if company:
-            employees = active_employees_for_company(company)
-        else:
-            employees = EmployeeProfile.objects.filter(is_active=True)
-        self.fields['employee'].queryset = employees
+        self.fields['employee'].queryset = active_employees_for_company(company)
+        if company is not None:
+            self.instance.company = company
         for field in self.fields.values():
             current_class = field.widget.attrs.get('class', '')
             field.widget.attrs['class'] = f'{current_class} form-control'.strip()

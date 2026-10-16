@@ -6,7 +6,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from employees.selectors import active_employees_for_company
-from employees.models import EmployeeProfile
 from incidents.models import Incident
 from leaves.models import LeaveRequest
 from scheduling.models import Shift
@@ -38,15 +37,22 @@ def days_inclusive(start_date, end_date):
     return (end_date - start_date).days + 1
 
 
+def _require_company(company, employee=None):
+    if company is None or company.pk is None:
+        raise ValueError('Indica una empresa guardada para calcular la pre-nomina.')
+    if employee is not None and employee.company_id != company.pk:
+        raise ValueError('El empleado debe pertenecer a la empresa indicada.')
+
+
 def calculate_clocked_hours(employee, start_dt, end_dt, company=None):
+    _require_company(company, employee)
     entries = TimeClockEntry.objects.filter(
         employee=employee,
+        company=company,
         status__in=VALID_CLOCK_STATUSES,
         timestamp__gte=start_dt,
         timestamp__lt=end_dt,
     )
-    if company:
-        entries = entries.filter(company=company)
     entries = list(entries.order_by('timestamp', 'id'))
     open_entry = None
     valid_seconds = 0
@@ -71,13 +77,9 @@ def calculate_clocked_hours(employee, start_dt, end_dt, company=None):
 
 
 def calculate_employee_summary(employee, year, month, company=None):
-    if company and employee.company_id != company.pk:
-        return None
+    _require_company(company, employee)
     first, last, start_dt, end_dt = month_bounds(year, month)
-    summary_company = company or (employee.company if employee.company_id else None)
-    shifts = Shift.objects.filter(employee=employee, is_active=True, date__range=(first, last))
-    if company:
-        shifts = shifts.filter(company=company)
+    shifts = Shift.objects.filter(employee=employee, company=company, is_active=True, date__range=(first, last))
     planned_hours = sum(
         (Decimal(str(shift.planned_duration_hours)) for shift in shifts),
         Decimal('0.00'),
@@ -87,24 +89,23 @@ def calculate_employee_summary(employee, year, month, company=None):
 
     approved_vacations = LeaveRequest.objects.filter(
         employee=employee,
+        company=company,
         status=LeaveRequest.Status.APPROVED,
         request_type=LeaveRequest.RequestType.VACATION,
         start_date__lte=last,
         end_date__gte=first,
     )
-    if company:
-        approved_vacations = approved_vacations.filter(company=company)
     approved_days_off = LeaveRequest.objects.filter(
         employee=employee,
+        company=company,
         status=LeaveRequest.Status.APPROVED,
         request_type=LeaveRequest.RequestType.DAY_OFF,
         start_date__lte=last,
         end_date__gte=first,
     )
-    if company:
-        approved_days_off = approved_days_off.filter(company=company)
     absences = LeaveRequest.objects.filter(
         employee=employee,
+        company=company,
         status=LeaveRequest.Status.APPROVED,
         request_type__in=[
             LeaveRequest.RequestType.JUSTIFIED_ABSENCE,
@@ -113,15 +114,12 @@ def calculate_employee_summary(employee, year, month, company=None):
         start_date__lte=last,
         end_date__gte=first,
     )
-    if company:
-        absences = absences.filter(company=company)
     pending_incidents_query = Incident.objects.filter(
         employee=employee,
+        company=company,
         status=Incident.Status.PENDING,
         date__range=(first, last),
     )
-    if company:
-        pending_incidents_query = pending_incidents_query.filter(company=company)
     pending_incidents = pending_incidents_query.count()
     detected_overtime = max(valid_hours - planned_hours, Decimal('0.00')).quantize(Decimal('0.01'))
     observations = []
@@ -135,7 +133,7 @@ def calculate_employee_summary(employee, year, month, company=None):
         year=year,
         month=month,
         defaults={
-            'company': summary_company,
+            'company': company,
             'contracted_hours': contracted_hours,
             'planned_hours': planned_hours.quantize(Decimal('0.01')),
             'valid_clocked_hours': valid_hours,
@@ -153,28 +151,25 @@ def calculate_employee_summary(employee, year, month, company=None):
 
 
 def recalculate_month(year, month, company=None):
+    _require_company(company)
     summaries = []
-    if company:
-        employees = active_employees_for_company(company).order_by('full_name')
-    else:
-        employees = EmployeeProfile.objects.filter(is_active=True).order_by('full_name')
+    employees = active_employees_for_company(company).order_by('full_name')
     for employee in employees:
         summary = calculate_employee_summary(employee, year, month, company=company)
-        if summary is not None:
-            summaries.append(summary)
+        summaries.append(summary)
     return summaries
 
 
 @transaction.atomic
 def generate_payroll_draft(year, month, user, company=None):
+    _require_company(company)
     summaries = recalculate_month(year, month, company=company)
     draft = PayrollDraft.objects.create(year=year, month=month, company=company, generated_by=user)
     for summary in summaries:
-        line_company = summary.company or summary.employee.company or draft.company
         PayrollDraftLine.objects.create(
             draft=draft,
             employee=summary.employee,
-            company=line_company,
+            company=company,
             contracted_hours=summary.contracted_hours,
             planned_hours=summary.planned_hours,
             valid_clocked_hours=summary.valid_clocked_hours,
