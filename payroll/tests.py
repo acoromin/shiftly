@@ -120,6 +120,27 @@ class MonthlySummaryTests(TestCase):
         self.assertIn('company', model_admin.list_display)
         self.assertIn('company', model_admin.autocomplete_fields)
 
+    def test_payroll_draft_requires_company_in_model_and_database(self):
+        draft = PayrollDraft(year=2026, month=6, generated_by=self.user)
+        with self.assertRaises(ValidationError) as context:
+            draft.save()
+        self.assertIn('company', context.exception.message_dict)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            PayrollDraft.objects.bulk_create([draft])
+
+    def test_payroll_draft_cannot_move_existing_lines_to_another_company(self):
+        draft = generate_payroll_draft(2026, 6, self.user, company=self.company)
+        draft.company = Company.objects.create(name='Empresa B')
+        with self.assertRaises(ValidationError):
+            draft.save(update_fields=['company'])
+        draft.refresh_from_db()
+        self.assertEqual(draft.company, self.company)
+
+    def test_payroll_draft_admin_exposes_company(self):
+        model_admin = admin.site._registry[PayrollDraft]
+        self.assertIn('company', model_admin.list_display)
+        self.assertIn('company', model_admin.autocomplete_fields)
+
     def test_recalculate_month_filters_by_company_when_provided(self):
         company = self.set_employee_company(name='Empresa A')
         other_company = Company.objects.create(name='Empresa B')

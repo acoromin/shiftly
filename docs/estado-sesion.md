@@ -19,25 +19,26 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Fase cerrada: `fase-hardening-monthlysummary-company-not-null` (fase 3), con migracion local aplicada.
-- Siguiente fase: `fase-hardening-payrolldraft-company-not-null` (fase 4).
-- Auditar borradores sin empresa, vacios y con lineas de empresas distintas antes de cambiar el esquema. No inferir empresa silenciosamente para borradores ambiguos.
-- Proteger altas/ediciones y admin, crear una migracion minima y comprobar preservacion de datos, tests relacionados y suite completa antes de cerrar.
-- No adelantar las lineas ni workplace/QR/IP/diseno antes de cerrar esta fase.
+- Fase cerrada: `fase-hardening-payrolldraft-company-not-null` (fase 4), con migracion local aplicada.
+- Siguiente fase: `fase-hardening-payrolldraftline-company-not-null` (fase 5).
+- Auditar lineas sin empresa o con diferencias entre linea, empleado y borrador antes de cambiar el esquema.
+- Proteger modelo/admin inline y servicios, crear una migracion minima, probar relaciones cruzadas y preservacion de datos, ejecutar suite completa y documentar.
+- No adelantar integridad general, admin por empresa ni workplace/QR/IP/diseno antes de cerrar esta fase.
 - La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias.
 
 ## Estado Actual Del Proyecto
 
-- Fase cerrada: `fase-hardening-monthlysummary-company-not-null`; 165 tests OK y migracion local aplicada. Baseline anterior: `0c4452a` (APIs internas sin empresa).
+- Fase cerrada: `fase-hardening-payrolldraft-company-not-null`; 170 tests OK y migracion local aplicada. Baseline anterior: `323969d` (resumenes con empresa obligatoria).
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
-- El commit de cierre de esta fase incluye los cambios de fichajes, sus tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
+- Cada fase cerrada dispone de su commit local con codigo, tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
 - `Shift.company` es obligatorio.
 - `LeaveRequest.company` es obligatorio.
 - `Incident.company` es obligatorio en codigo y migracion `incidents/migrations/0007_alter_incident_company.py`.
 - `TimeClockEntry.company` es obligatorio en modelo y DB local con `timeclock.0006_alter_timeclockentry_company` aplicada. Su auditoria previa bloquea null e inconsistencias antes de cambiar el esquema.
 - `MonthlyHoursSummary.company` es obligatorio y coherente con el empleado; `payroll.0005` aplicada localmente.
-- `PayrollDraft.company` y `PayrollDraftLine.company` siguen nullable.
+- `PayrollDraft.company` es obligatorio; `payroll.0006` aplicada. Los borradores con lineas no se pueden mover a una empresa incompatible.
+- `PayrollDraftLine.company` sigue nullable.
 - `EmployeeProfile.primary_workplace`, `Shift.workplace` y `TimeClockEntry.workplace` siguen nullable y fuera del siguiente paso.
 - Admin operativo sin `company` esta cerrado en vistas cliente.
 - Staff/superuser sin perfil no tiene panel operativo global de cliente.
@@ -47,6 +48,8 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - `docs/hardening-company-not-null-plan.md` es plan historico de la primera etapa; la fuente viva es este archivo.
 
 ## Ultima Auditoria De Datos
+
+Auditoria ORM local 2026-10-16 previa a `payroll.0006`: borradores total 0, company=NULL 0, vacios 0, empresas mixtas 0, mismatch linea/borrador 0 y empleado/borrador 0. Copia: `backups/shiftly-pre-payrolldraft-20261016-214431.sqlite3`. NOT NULL posterior confirmado.
 
 Auditoria ORM local 2026-10-16 previa a `payroll.0005`: MonthlyHoursSummary total 0, company=NULL 0, mismatch employee/company 0. Base nueva; sin backfill adicional. Copia previa: `backups/shiftly-pre-monthlysummary-20261016-214213.sqlite3`. Esquema posterior NOT NULL confirmado por introspeccion.
 
@@ -78,6 +81,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Fase `fase-hardening-payrolldraft-company-not-null`, 2026-10-16: tests `payroll reports` 28 OK; suite global 170 OK; check/makemigrations/diff OK; `payroll.0006` aplicada e introspeccion NOT NULL OK.
 
 Fase `fase-hardening-monthlysummary-company-not-null`, 2026-10-16: tests `payroll reports timeclock dashboard` 69 OK; suite global 165 OK; check, makemigrations --check --dry-run y diff --check OK; `payroll.0005` aplicada e introspeccion NOT NULL OK.
 
@@ -171,6 +176,8 @@ Validaciones historicas relevantes:
 
 ## Invariantes Cerradas
 
+- PayrollDraft exige empresa en modelo y DB y rechaza cambios de empresa incompatibles con sus lineas/empleados. Los borradores vacios con empresa conocida siguen siendo validos.
+
 - MonthlyHoursSummary exige empresa en modelo y DB; save() valida la coincidencia con employee.company.
 
 - Los cuatro servicios de payroll exigen empresa guardada explicita; los calculos de empleado rechazan otra empresa antes de consultar datos.
@@ -192,7 +199,6 @@ Validaciones historicas relevantes:
 
 ## Invariantes Pendientes
 
-- `PayrollDraft.company` debe ser obligatorio salvo decision explicita de borradores globales.
 - `PayrollDraftLine.company` debe ser obligatorio y coincidir con `draft.company` y `employee.company`.
 - `Incident.shift.employee` debe coincidir con `Incident.employee`.
 - `Incident.timeclock_entry.employee` debe coincidir con `Incident.employee`.
@@ -231,6 +237,7 @@ Validaciones historicas relevantes:
 - `fase-hardening-timeclockentry-company-not-null`: empresa obligatoria en fichajes, guardas de migracion, validacion al guardar, formulario manual cerrado sin empresa y 154 tests OK; aplicada en base local nueva.
 - `fase-cierre-company-none-en-apis-internas`: formularios y servicios sin fallback global, llamadas worker explicitas y 161 tests OK.
 - `fase-hardening-monthlysummary-company-not-null`: migracion `payroll.0005`, validacion del modelo/admin y 165 tests OK.
+- `fase-hardening-payrolldraft-company-not-null`: migracion `payroll.0006`, validacion al guardar y 170 tests OK.
 
 ## Hoja De Ruta Priorizada
 
@@ -404,8 +411,8 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 
 ## Deudas Pendientes Importantes
 
-- Ejecutar `fase-hardening-payrolldraft-company-not-null` antes de endurecer lineas.
-- Endurecer payroll por fases: `MonthlyHoursSummary`, `PayrollDraft`, `PayrollDraftLine`.
+- Ejecutar `fase-hardening-payrolldraftline-company-not-null` para cerrar las lineas.
+- Completar el endurecimiento de `PayrollDraftLine`; MonthlyHoursSummary y PayrollDraft ya estan cerrados.
 - Decidir cuando endurecer `workplace` a no nullable por modelo.
 - Mover configuracion QR/IP desde `BusinessConfig` global a `Workplace`.
 - Decidir si hace falta panel operativo global interno para staff/superuser y como evitar que cree datos con `company=NULL`.
@@ -472,3 +479,12 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - Tests relacionados: 69 OK; suite: 165 OK; check/makemigrations/diff OK. Copia local previa realizada; migracion aplicada y NOT NULL verificado en SQLite.
 - PayrollDraft y PayrollDraftLine siguen nullable hasta sus fases. No se han cambiado centros ni QR/IP ni templates.
 - Commit local: `fase-hardening-monthlysummary-company-not-null`. Siguiente: PayrollDraft.company NOT NULL.
+
+## Cierre 2026-10-16 - Empresa Obligatoria En Borradores
+
+- Auditoria ORM previa: 0 borradores, null, vacios, mixtos y discrepancias linea/borrador o empleado/borrador. Sin saneamiento necesario en la base local nueva.
+- PayrollDraft exige company; save() valida datos y evita mover un borrador existente fuera de la empresa de sus lineas/empleados. Admin muestra empresa con autocompletado.
+- Migracion unica `payroll.0006` con auditoria previa sin escrituras: rechaza null y relaciones cruzadas, sin adivinar empresas ni reescribir datos.
+- Pruebas con esquema historico: conserva borradores vacios y con lineas; bloquea borradores ambiguos o cruzados antes del DDL. Campos de linea siguen nullable hasta fase 5.
+- Tests relacionados: 28 OK; suite: 170 OK; check/makemigrations/diff OK. Copia previa realizada, migracion aplicada y NOT NULL confirmado en SQLite.
+- Commit local: `fase-hardening-payrolldraft-company-not-null`. Siguiente: PayrollDraftLine.company NOT NULL.

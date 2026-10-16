@@ -59,8 +59,6 @@ class PayrollDraft(models.Model):
         on_delete=models.PROTECT,
         related_name='payroll_drafts',
         verbose_name='empresa',
-        blank=True,
-        null=True,
     )
     status = models.CharField('estado', max_length=20, choices=Status.choices, default=Status.DRAFT)
     generated_by = models.ForeignKey(
@@ -79,6 +77,17 @@ class PayrollDraft(models.Model):
 
     def __str__(self):
         return f'Borrador {self.month:02d}/{self.year}'
+
+    def clean(self):
+        if self.pk and self.company_id:
+            foreign_lines = self.lines.filter(company__isnull=False).exclude(company_id=self.company_id)
+            foreign_employees = self.lines.exclude(employee__company_id=self.company_id)
+            if foreign_lines.exists() or foreign_employees.exists():
+                raise ValidationError({'company': 'La empresa del borrador debe coincidir con sus lineas y empleados.'})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
 
 class PayrollDraftLine(models.Model):

@@ -43,8 +43,9 @@ class PayrollDraftLineInline(admin.TabularInline):
 
 @admin.register(PayrollDraft)
 class PayrollDraftAdmin(admin.ModelAdmin):
-    list_display = ('year', 'month', 'status', 'generated_by', 'generated_at')
-    list_filter = ('status', 'year', 'month')
+    list_display = ('year', 'month', 'company', 'status', 'generated_by', 'generated_at')
+    list_filter = ('company', 'status', 'year', 'month')
+    autocomplete_fields = ('company', 'generated_by')
     search_fields = ('generated_by__username', 'notes')
     readonly_fields = ('generated_at',)
     inlines = (PayrollDraftLineInline,)

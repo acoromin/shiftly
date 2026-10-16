@@ -73,3 +73,34 @@ class MonthlySummaryCompanyMigrationTests(PayrollMigrationTestCase):
                 self.assert_migration_blocked(message)
                 self.assertTrue(self.company_nullable(self.Summary))
                 summary.delete()
+
+
+class PayrollDraftCompanyMigrationTests(PayrollMigrationTestCase):
+    migrate_from = ('payroll', '0005_alter_monthlyhourssummary_company')
+    migrate_to = ('payroll', '0006_alter_payrolldraft_company')
+
+    def test_migration_preserves_empty_and_populated_company_drafts(self):
+        empty = self.Draft.objects.create(year=2026, month=6, company=self.company, generated_by=self.user)
+        draft = self.Draft.objects.create(year=2026, month=6, company=self.company, generated_by=self.user)
+        line = self.Line.objects.create(draft=draft, employee=self.employee, company=self.company, observations='Conservar')
+        MigrationExecutor(connection).migrate([self.migrate_to])
+        for obj in (empty, draft, line):
+            obj.refresh_from_db()
+            self.assertEqual(obj.company_id, self.company.pk)
+        self.assertEqual(line.observations, 'Conservar')
+        self.assertFalse(self.company_nullable(self.Draft))
+        self.assertTrue(self.company_nullable(self.Line))
+
+    def test_migration_rejects_ambiguous_or_cross_company_drafts(self):
+        draft = self.Draft.objects.create(year=2026, month=6, generated_by=self.user)
+        self.assert_migration_blocked('company_null=1')
+        draft.company = self.company
+        draft.save()
+        line = self.Line.objects.create(draft=draft, employee=self.employee, company=self.other_company)
+        self.assert_migration_blocked('line_draft_company_mismatch=1')
+        line.company = self.company
+        line.save()
+        draft.company = self.other_company
+        draft.save()
+        self.assert_migration_blocked('employee_draft_company_mismatch=1')
+        self.assertTrue(self.company_nullable(self.Draft))
