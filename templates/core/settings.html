@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración | Xarlot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Administración</p>
+        <h1>Configuración</h1>
+        <p>Datos del negocio, fichajes y ventana de mantenimiento.</p>
+    </div>
+</header>
+
+<form class="surface form-surface" method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+    <section class="form-section">
+        <h2>Negocio y fichajes</h2>
+        <div class="form-grid">
+            {% include "shared/form_field.html" with field=form.name %}
+            {% include "shared/form_field.html" with field=form.public_wifi_ip %}
+            {% include "shared/form_field.html" with field=form.clock_tolerance_minutes %}
+        </div>
+    </section>
+
+    <section class="form-section">
+        <div class="maintenance-heading">
+            <div>
+                <h2>Modo mantenimiento</h2>
+                <p>El lunes es el día recomendado porque el bar permanece cerrado. No se activa automáticamente.</p>
+            </div>
+            <span class="status-badge status-{% if maintenance_active_now %}pending{% else %}approved{% endif %}">
+                {% if maintenance_active_now %}Activo ahora{% else %}Aplicación disponible{% endif %}
+            </span>
+        </div>
+
+        <div class="maintenance-toggle">
+            {{ form.maintenance_enabled }}
+            <label for="{{ form.maintenance_enabled.id_for_label }}">
+                <strong>Activar inmediatamente</strong>
+                <span>Puede utilizarse cualquier día si ocurre una emergencia grave.</span>
+            </label>
+        </div>
+        {% for error in form.maintenance_enabled.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+
+        <div class="form-grid mt-3">
+            {% include "shared/form_field.html" with field=form.maintenance_scheduled_start %}
+            {% include "shared/form_field.html" with field=form.maintenance_scheduled_end %}
+            {% include "shared/form_field.html" with field=form.maintenance_reason %}
+        </div>
+        {% include "shared/form_field.html" with field=form.maintenance_message %}
+
+        <div class="maintenance-note">
+            <strong>Durante el mantenimiento</strong>
+            <span>Los trabajadores no pueden fichar, crear solicitudes ni acceder a sus pantallas. Los administradores mantienen el acceso completo.</span>
+        </div>
+    </section>
+
+    <div class="form-actions maintenance-actions">
+        <button class="btn btn-outline-danger" name="action" value="disable" type="submit">Desactivar y borrar programación</button>
+        <div>
+            <button class="btn btn-outline-primary" name="action" value="activate" type="submit">Activar ahora</button>
+            <button class="btn btn-primary" name="action" value="save" type="submit">Guardar configuración</button>
+        </div>
+    </div>
+</form>
+{% endblock %}

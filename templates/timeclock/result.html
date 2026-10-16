@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado fichaje | Xarlot{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-7 col-lg-5">
+        <div class="clock-panel p-4 text-center">
+            <p class="text-uppercase text-muted-strong small fw-semibold mb-1">Xarlot</p>
+            <h1 class="h3 mb-3">Fichaje procesado</h1>
+            <p class="text-secondary mb-4">Puedes volver al panel o revisar tu historial.</p>
+            <div class="d-grid gap-2">
+                <a class="btn btn-primary" href="{% url 'dashboard:index' %}">Volver al panel</a>
+                <a class="btn btn-outline-primary" href="{% url 'timeclock:history' %}">Ver fichajes</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

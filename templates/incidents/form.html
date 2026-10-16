@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva incidencia | Xarlot{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-7">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div>
+                <h1 class="h3 mb-1">Nueva incidencia</h1>
+                <p class="text-secondary mb-0">Comunica un error de fichaje para que lo revise el administrador.</p>
+            </div>
+            <a class="btn btn-outline-secondary" href="{% url 'incidents:list' %}">Volver</a>
+        </div>
+        <form class="card shadow-sm" method="post" novalidate>
+            <div class="card-body">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-end gap-2">
+                <a class="btn btn-outline-secondary" href="{% url 'incidents:list' %}">Cancelar</a>
+                <button class="btn btn-primary" type="submit">Enviar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

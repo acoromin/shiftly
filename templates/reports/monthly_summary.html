@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Resumen mensual | Xarlot{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Resumen mensual</h1>
+        <p class="text-secondary mb-0">{{ month|stringformat:"02d" }}/{{ year }}</p>
+    </div>
+    <form class="d-flex flex-wrap gap-2" method="get">
+        <input class="form-control" style="max-width: 7rem" type="number" name="month" min="1" max="12" value="{{ month }}">
+        <input class="form-control" style="max-width: 8rem" type="number" name="year" min="2020" value="{{ year }}">
+        <button class="btn btn-outline-primary" type="submit">Ver</button>
+        <a class="btn btn-primary" href="{% url 'reports:payroll-csv' %}?month={{ month }}&year={{ year }}">CSV para gestoría</a>
+    </form>
+</div>
+
+<div class="table-responsive bg-white border rounded">
+    <table class="table table-sm align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Empleado</th>
+                <th>Contratadas</th>
+                <th>Planificadas</th>
+                <th>Fichadas</th>
+                <th>Revisión</th>
+                <th>Extra detectada</th>
+                <th>Extra aprobada</th>
+                <th>Vacaciones</th>
+                <th>Libres</th>
+                <th>Ausencias</th>
+                <th>Incidencias</th>
+                <th>Observaciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in summaries %}
+                <tr>
+                    <td class="fw-semibold">{{ row.employee.full_name }}</td>
+                    <td>{{ row.contracted_hours }}</td>
+                    <td>{{ row.planned_hours }}</td>
+                    <td>{{ row.valid_clocked_hours }}</td>
+                    <td>{{ row.pending_review_hours }}</td>
+                    <td>{{ row.detected_overtime_hours }}</td>
+                    <td>{{ row.approved_overtime_hours }}</td>
+                    <td>{{ row.approved_vacation_days }}</td>
+                    <td>{{ row.approved_day_off_days }}</td>
+                    <td>{{ row.absence_days }}</td>
+                    <td>{{ row.pending_incidents_count }}</td>
+                    <td>{{ row.observations }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td class="text-secondary" colspan="12">No hay empleados activos.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

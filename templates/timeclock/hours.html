@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Mis horas | Xarlot{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+    <div>
+        <p class="text-uppercase text-muted-strong small fw-semibold mb-1">Resumen mensual</p>
+        <h1 class="h3 mb-1">Mis horas</h1>
+        <p class="text-secondary mb-0">{{ profile.full_name }} · {{ month|stringformat:"02d" }}/{{ year }}</p>
+    </div>
+    <form class="d-flex flex-wrap gap-2" method="get">
+        <input class="form-control" style="max-width: 7rem" type="number" name="month" min="1" max="12" value="{{ month }}" aria-label="Mes">
+        <input class="form-control" style="max-width: 8rem" type="number" name="year" min="2020" value="{{ year }}" aria-label="Año">
+        <button class="btn btn-primary" type="submit">Consultar</button>
+    </form>
+</div>
+
+<div class="row g-3">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 metric-card"><div class="card-body">
+            <div class="text-secondary small">Horas fichadas</div>
+            <div class="h3 mb-0">{{ summary.valid_clocked_hours }} h</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 metric-card"><div class="card-body">
+            <div class="text-secondary small">Horas planificadas</div>
+            <div class="h3 mb-0">{{ summary.planned_hours }} h</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 metric-card"><div class="card-body">
+            <div class="text-secondary small">Horas contratadas</div>
+            <div class="h3 mb-0">{{ summary.contracted_hours }} h</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 metric-card"><div class="card-body">
+            <div class="text-secondary small">Horas extra detectadas</div>
+            <div class="h3 mb-0">{{ summary.detected_overtime_hours }} h</div>
+        </div></div>
+    </div>
+</div>
+
+{% if summary.observations %}
+    <div class="alert alert-warning mt-3 mb-0">{{ summary.observations }}</div>
+{% endif %}
+{% endblock %}

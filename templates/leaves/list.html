@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Vacaciones y días libres | Xarlot{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">{% if can_review %}Vacaciones y días libres{% else %}Mis solicitudes{% endif %}</h1>
+        <p class="text-secondary mb-0">Vacaciones, días libres y faltas o ausencias.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'leaves:create' %}">Nueva solicitud</a>
+</div>
+
+<div class="list-group">
+    {% for item in leave_requests %}
+        <div class="list-group-item">
+            <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                <div>
+                    <div class="fw-semibold">{{ item.get_request_type_display }} · {{ item.start_date|date:"d/m/Y" }} - {{ item.end_date|date:"d/m/Y" }}</div>
+                    {% if can_review %}<div class="text-secondary small">{{ item.employee.full_name }}</div>{% endif %}
+                    {% if item.worker_comment %}<p class="mb-0 mt-2">{{ item.worker_comment }}</p>{% endif %}
+                    {% if item.admin_comment %}<p class="text-secondary small mb-0 mt-2">Revisión: {{ item.admin_comment }}</p>{% endif %}
+                </div>
+                <div class="text-md-end">
+                    <span class="status-badge status-{{ item.status }}">{{ item.get_status_display }}</span>
+                    {% if can_review and item.status == "pending" %}
+                        <div class="mt-2 d-flex gap-2 justify-content-md-end">
+                            <a class="btn btn-sm btn-outline-success" href="{% url 'leaves:review' item.pk 'approved' %}">Aprobar</a>
+                            <a class="btn btn-sm btn-outline-danger" href="{% url 'leaves:review' item.pk 'rejected' %}">Rechazar</a>
+                        </div>
+                    {% endif %}
+                    {% if not can_review and item.status == "pending" %}
+                        <form class="mt-2" method="post" action="{% url 'leaves:cancel' item.pk %}" onsubmit="return confirm('¿Cancelar esta solicitud?');">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-outline-danger" type="submit">Cancelar solicitud</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="list-group-item text-secondary">No hay solicitudes.</div>
+    {% endfor %}
+</div>
+{% endblock %}

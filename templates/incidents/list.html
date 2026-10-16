@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Incidencias | Xarlot{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">{% if can_resolve %}Incidencias{% else %}Mis incidencias{% endif %}</h1>
+        <p class="text-secondary mb-0">Errores de fichaje comunicados para su revisión.</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'incidents:create' %}">Nueva incidencia</a>
+</div>
+
+<div class="list-group">
+    {% for incident in incidents %}
+        <div class="list-group-item">
+            <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                <div>
+                    <div class="fw-semibold">{{ incident.get_incident_type_display }} · {{ incident.date|date:"d/m/Y" }}</div>
+                    {% if can_resolve %}<div class="text-secondary small">{{ incident.employee.full_name }}</div>{% endif %}
+                    <p class="mb-0 mt-2">{{ incident.description }}</p>
+                    {% if incident.resolution_comment %}<p class="text-secondary small mb-0 mt-2">Resolución: {{ incident.resolution_comment }}</p>{% endif %}
+                </div>
+                <div class="text-md-end">
+                    <span class="status-badge status-{{ incident.status }}">{{ incident.get_status_display }}</span>
+                    {% if can_resolve and incident.status == "pending" %}
+                        <div class="mt-2 d-flex gap-2 justify-content-md-end">
+                            <a class="btn btn-sm btn-outline-success" href="{% url 'incidents:resolve' incident.pk 'approved' %}">Aprobar</a>
+                            <a class="btn btn-sm btn-outline-danger" href="{% url 'incidents:resolve' incident.pk 'rejected' %}">Rechazar</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'incidents:resolve' incident.pk 'resolved' %}">Resolver</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="list-group-item text-secondary">No hay incidencias.</div>
+    {% endfor %}
+</div>
+{% endblock %}

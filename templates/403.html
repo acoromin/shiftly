@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Acceso no permitido | Xarlot{% endblock %}
+
+{% block content %}
+<div class="surface error-page">
+    <p class="eyebrow">Acceso no permitido</p>
+    <h1>No puedes entrar en esta sección</h1>
+    <p>Tu usuario no tiene permiso para consultar esta información.</p>
+    <a class="btn btn-primary" href="{% url 'dashboard:index' %}">Volver al panel</a>
+</div>
+{% endblock %}

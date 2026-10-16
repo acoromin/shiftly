@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Página no encontrada | Xarlot{% endblock %}
+
+{% block content %}
+<div class="surface error-page">
+    <p class="eyebrow">Página no encontrada</p>
+    <h1>Esta dirección no existe</h1>
+    <p>Puede que el enlace haya cambiado o que el contenido ya no esté disponible.</p>
+    <a class="btn btn-primary" href="{% url 'dashboard:index' %}">Volver al panel</a>
+</div>
+{% endblock %}

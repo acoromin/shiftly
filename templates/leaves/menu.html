@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva solicitud | Xarlot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Solicitudes</p>
+        <h1>¿Qué necesitas comunicar?</h1>
+        <p>Selecciona una opción para abrir el formulario adecuado.</p>
+    </div>
+</header>
+<div class="action-grid">
+    <a class="action-tile" href="{% url 'leaves:create-typed' 'vacation' %}">
+        <strong>Solicitar vacaciones</strong><span>Uno o varios días de vacaciones.</span>
+    </a>
+    <a class="action-tile" href="{% url 'leaves:create-typed' 'day_off' %}">
+        <strong>Solicitar día libre</strong><span>Un día libre concreto.</span>
+    </a>
+    <a class="action-tile" href="{% url 'leaves:create-typed' 'justified_absence' %}">
+        <strong>Comunicar ausencia</strong><span>Una falta o ausencia justificada.</span>
+    </a>
+    <a class="action-tile" href="{% url 'leaves:create-typed' 'medical_absence' %}">
+        <strong>Comunicar baja médica</strong><span>Un periodo de baja médica.</span>
+    </a>
+</div>
+{% endblock %}

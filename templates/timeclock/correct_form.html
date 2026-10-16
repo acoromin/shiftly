@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Corregir fichaje | Xarlot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Fichajes</p>
+        <h1>Corregir fichaje</h1>
+        <p>{{ entry.employee.full_name }} · {{ entry.timestamp|date:"d/m/Y H:i" }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'timeclock:history' %}">Volver</a>
+</header>
+<form class="surface form-surface form-narrow" method="post" novalidate>
+    {% csrf_token %}
+    {% include "shared/form_field.html" with field=form.entry_type %}
+    {% include "shared/form_field.html" with field=form.timestamp %}
+    {% include "shared/form_field.html" with field=form.manual_reason %}
+    <div class="form-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'timeclock:history' %}">Cancelar</a>
+        <button class="btn btn-primary" type="submit">Guardar corrección</button>
+    </div>
+</form>
+{% endblock %}

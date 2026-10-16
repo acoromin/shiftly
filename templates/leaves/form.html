@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | Xarlot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Solicitudes</p>
+        <h1>{{ title }}</h1>
+        <p>{{ description }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'leaves:list' %}">Volver</a>
+</header>
+<form class="surface form-surface form-narrow" method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    {{ form.request_type }}
+    {% include "shared/form_field.html" with field=form.start_date %}
+    {% include "shared/form_field.html" with field=form.end_date %}
+    {% include "shared/form_field.html" with field=form.worker_comment %}
+    <div class="form-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'leaves:list' %}">Cancelar</a>
+        <button class="btn btn-primary" type="submit">Enviar solicitud</button>
+    </div>
+</form>
+{% endblock %}

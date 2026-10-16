@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{% if creating %}Nuevo turno{% else %}Editar turno{% endif %} | Xarlot{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-7">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div>
+                <h1 class="h3 mb-1">{% if creating %}Nuevo turno{% else %}Editar turno{% endif %}</h1>
+                <p class="text-secondary mb-0">{% if creating %}Crea un turno para un trabajador activo.{% else %}Actualiza el horario o los datos del turno.{% endif %}</p>
+            </div>
+            <a class="btn btn-outline-secondary" href="{% url 'scheduling:week' %}">Volver</a>
+        </div>
+
+        <form class="card shadow-sm" method="post" novalidate>
+            <div class="card-body">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="card-footer bg-white d-flex justify-content-end gap-2">
+                <a class="btn btn-outline-secondary" href="{% url 'scheduling:week' %}">Cancelar</a>
+                <button class="btn btn-primary" type="submit">{% if creating %}Crear turno{% else %}Guardar cambios{% endif %}</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}{% if creating %}Añadir trabajador{% else %}Editar trabajador{% endif %} | Xarlot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Empleados</p>
+        <h1>{% if creating %}Añadir trabajador{% else %}Editar trabajador{% endif %}</h1>
+        <p>{% if creating %}El usuario y la ficha laboral se crearán juntos.{% else %}{{ employee.full_name }}{% endif %}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'employees:list' %}">Volver</a>
+</header>
+
+<form class="surface form-surface" method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-section">
+        <h2>Acceso</h2>
+        <div class="form-grid">
+            {% include "shared/form_field.html" with field=form.username %}
+            {% include "shared/form_field.html" with field=form.email %}
+            {% include "shared/form_field.html" with field=form.password %}
+            {% include "shared/form_field.html" with field=form.password_confirm %}
+        </div>
+    </div>
+    <div class="form-section">
+        <h2>Datos personales</h2>
+        <div class="form-grid">
+            {% include "shared/form_field.html" with field=form.full_name %}
+            {% include "shared/form_field.html" with field=form.phone %}
+            {% include "shared/form_field.html" with field=form.dni_nie %}
+        </div>
+    </div>
+    <div class="form-section">
+        <h2>Datos laborales</h2>
+        <div class="form-grid">
+            {% include "shared/form_field.html" with field=form.role %}
+            {% include "shared/form_field.html" with field=form.primary_position %}
+            {% include "shared/form_field.html" with field=form.contract_type %}
+            {% include "shared/form_field.html" with field=form.weekly_contracted_hours %}
+            {% include "shared/form_field.html" with field=form.start_date %}
+            {% include "shared/form_field.html" with field=form.end_date %}
+            {% include "shared/form_field.html" with field=form.base_monthly_salary %}
+            {% include "shared/form_field.html" with field=form.hourly_rate %}
+        </div>
+        {% include "shared/form_field.html" with field=form.internal_notes %}
+    </div>
+    <div class="form-actions">
+        <a class="btn btn-outline-secondary" href="{% url 'employees:list' %}">Cancelar</a>
+        <button class="btn btn-primary" type="submit">{% if creating %}Añadir trabajador{% else %}Guardar cambios{% endif %}</button>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Fichajes | Xarlot{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">Fichajes</h1>
+        <p class="text-secondary mb-0">{% if can_view_team %}Historial del equipo.{% else %}Tu historial.{% endif %}</p>
+    </div>
+    {% if can_view_team %}
+        <a class="btn btn-primary" href="{% url 'timeclock:manual-create' %}">Fichaje manual</a>
+    {% endif %}
+</div>
+
+<div class="table-responsive bg-white border rounded">
+    <table class="table table-sm align-middle mb-0">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                {% if can_view_team %}<th>Empleado</th>{% endif %}
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>IP</th>
+                <th>Creado por</th>
+                <th>Motivo</th>
+                {% if can_view_team %}<th></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+                <tr>
+                    <td>{{ entry.timestamp|date:"d/m/Y H:i" }}</td>
+                    {% if can_view_team %}<td>{{ entry.employee.full_name }}</td>{% endif %}
+                    <td>{{ entry.get_entry_type_display }}</td>
+                    <td><span class="status-badge status-{{ entry.status }}">{{ entry.get_status_display }}</span></td>
+                    <td>{{ entry.detected_ip|default:"-" }}</td>
+                    <td>{{ entry.created_by.get_username }}</td>
+                    <td>{{ entry.manual_reason|default:"" }}</td>
+                    {% if can_view_team %}<td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'timeclock:correct' entry.pk %}">Corregir</a></td>{% endif %}
+                </tr>
+            {% empty %}
+                <tr>
+                    <td class="text-secondary" colspan="{% if can_view_team %}8{% else %}6{% endif %}">No hay fichajes.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

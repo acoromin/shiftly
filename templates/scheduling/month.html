@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Calendario de turnos | Xarlot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">{% if can_manage_shifts %}Planificación del equipo{% else %}Mi horario{% endif %}</p>
+        <h1>{{ selected|date:"F Y"|capfirst }}</h1>
+        <p>Vista mensual de turnos</p>
+    </div>
+    <div class="header-actions">
+        <div class="view-switch">
+            <a href="{% url 'scheduling:week' %}">Semana</a>
+            <a class="active" href="{% url 'scheduling:month' %}?year={{ selected|date:'Y' }}&month={{ selected|date:'n' }}">Mes</a>
+        </div>
+        {% if can_manage_shifts %}<a class="btn btn-primary" href="{% url 'scheduling:create' %}">Nuevo turno</a>{% endif %}
+    </div>
+</header>
+<div class="toolbar">
+    <a class="btn btn-outline-secondary" href="?year={{ previous_month|date:'Y' }}&month={{ previous_month|date:'n' }}">Mes anterior</a>
+    <a class="btn btn-outline-secondary" href="{% url 'scheduling:month' %}">Hoy</a>
+    <a class="btn btn-outline-secondary" href="?year={{ next_month|date:'Y' }}&month={{ next_month|date:'n' }}">Mes siguiente</a>
+</div>
+<div class="month-calendar">
+    <div class="month-weekdays"><span>Lunes</span><span>Martes</span><span>Miércoles</span><span>Jueves</span><span>Viernes</span><span>Sábado</span><span>Domingo</span></div>
+    {% for week in weeks %}
+        <div class="month-week">
+            {% for day in week %}
+                <section class="month-day{% if not day.in_month %} outside{% endif %}">
+                    <div class="month-day-header">
+                        <span>{{ day.date|date:"j" }}</span>
+                        {% if can_manage_shifts %}<a href="{% url 'scheduling:create' %}?fecha={{ day.date|date:'Y-m-d' }}" title="Añadir turno">+</a>{% endif %}
+                    </div>
+                    {% for shift in day.shifts %}
+                        {% if can_manage_shifts %}
+                            <a class="month-shift shift-{{ shift.position }}" href="{% url 'scheduling:edit' shift.pk %}">
+                                <strong>{{ shift.start_time|time:"H:i" }}</strong>
+                                <span>{{ shift.employee.full_name }}</span>
+                            </a>
+                        {% else %}
+                            <div class="month-shift shift-{{ shift.position }}"><strong>{{ shift.start_time|time:"H:i" }}</strong></div>
+                        {% endif %}
+                    {% endfor %}
+                </section>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

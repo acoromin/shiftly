@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Turnos | Xarlot{% endblock %}
+
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">{% if can_manage_shifts %}Planificación del equipo{% else %}Mi horario{% endif %}</p>
+        <h1>Semana del {{ week_start|date:"d/m/Y" }}</h1>
+        <p>{{ week_shift_count }} turno{% if week_shift_count != 1 %}s{% endif %} · {{ week_total_hours|floatformat:2 }} h planificadas</p>
+    </div>
+    <div class="header-actions">
+        <div class="view-switch">
+            <a class="active" href="{% url 'scheduling:week' %}?week={{ week_start|date:'Y-m-d' }}">Semana</a>
+            <a href="{% url 'scheduling:month' %}?year={{ week_start|date:'Y' }}&month={{ week_start|date:'n' }}">Mes</a>
+        </div>
+        {% if can_manage_shifts %}<a class="btn btn-primary" href="{% url 'scheduling:create' %}">Nuevo turno</a>{% endif %}
+    </div>
+</header>
+
+<div class="toolbar toolbar-between">
+    <div class="button-group">
+        <a class="btn btn-outline-secondary" href="?week={{ previous_week|date:'Y-m-d' }}">Anterior</a>
+        <a class="btn btn-outline-secondary" href="{% url 'scheduling:week' %}">Hoy</a>
+        <a class="btn btn-outline-secondary" href="?week={{ next_week|date:'Y-m-d' }}">Siguiente</a>
+    </div>
+    {% if can_manage_shifts %}
+        <form method="post" action="{% url 'scheduling:copy-week' %}?week={{ week_start|date:'Y-m-d' }}">
+            {% csrf_token %}
+            <button class="btn btn-outline-primary" type="submit">Copiar semana anterior</button>
+        </form>
+    {% endif %}
+</div>
+
+{% for warning in workload_warnings %}
+    <div class="alert alert-warning">{{ warning.employee.full_name }} tiene {{ warning.hours|floatformat:1 }} h planificadas y {{ warning.contracted|floatformat:1 }} h contratadas.</div>
+{% endfor %}
+
+{% if not profile %}
+    <div class="alert alert-warning">Tu usuario todavía no tiene un perfil de empleado activo.</div>
+{% else %}
+    <div class="schedule-board">
+        {% for day in days %}
+            <section class="schedule-day{% if day.shifts %} has-shifts{% endif %}">
+                <div class="schedule-day-header">
+                    <div>
+                        <div class="schedule-day-name">{{ day.date|date:"l" }}</div>
+                        <div class="schedule-day-date">{{ day.date|date:"d/m" }}</div>
+                    </div>
+                    <div class="schedule-day-tools">
+                        <span class="schedule-day-total">{{ day.total_hours|floatformat:1 }} h</span>
+                        {% if can_manage_shifts %}<a class="day-add" href="{% url 'scheduling:create' %}?fecha={{ day.date|date:'Y-m-d' }}" title="Añadir turno">+</a>{% endif %}
+                    </div>
+                </div>
+                <div class="schedule-day-body">
+                    {% for shift in day.shifts %}
+                        <article class="shift-block shift-{{ shift.position }}">
+                            <div class="shift-time">{{ shift.start_time|time:"H:i" }} - {{ shift.end_time|time:"H:i" }}</div>
+                            <div class="shift-meta">
+                                <span>{{ shift.get_position_display }}</span>
+                                <span>{{ shift.planned_duration_hours|floatformat:2 }} h</span>
+                            </div>
+                            {% if can_manage_shifts %}<div class="shift-employee">{{ shift.employee.full_name }}</div>{% endif %}
+                            {% if shift.notes %}<p class="shift-notes">{{ shift.notes }}</p>{% endif %}
+                            {% if can_manage_shifts %}
+                                <div class="shift-actions">
+                                    <a href="{% url 'scheduling:edit' shift.pk %}">Editar</a>
+                                    <form method="post" action="{% url 'scheduling:duplicate' shift.pk %}">{% csrf_token %}<button type="submit">Duplicar</button></form>
+                                    <form method="post" action="{% url 'scheduling:cancel' shift.pk %}" onsubmit="return confirm('¿Cancelar este turno?');">{% csrf_token %}<button class="danger-link" type="submit">Cancelar</button></form>
+                                </div>
+                            {% endif %}
+                        </article>
+                    {% empty %}
+                        <div class="schedule-empty">Libre</div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+{% endif %}
+{% endblock %}

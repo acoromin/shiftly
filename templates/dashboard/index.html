@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}{% if role == "administrador" %}Panel principal{% else %}Mi panel{% endif %} | Xarlot{% endblock %}
+
+{% block content %}
+{% if role == "administrador" %}
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Hoy · {{ today|date:"d/m/Y" }}</p>
+            <h1>Panel principal</h1>
+            <p>Resumen operativo de Xarlot.</p>
+        </div>
+        <div class="header-actions">
+            <a class="btn btn-outline-primary" href="{% url 'employees:create' %}">Añadir trabajador</a>
+            <a class="btn btn-primary" href="{% url 'scheduling:create' %}">Crear turno</a>
+        </div>
+    </header>
+
+    <div class="metric-grid">
+        <a class="metric-box" href="{% url 'timeclock:history' %}"><span>Trabajando ahora</span><strong>{{ open_clock_entries|length }}</strong></a>
+        <a class="metric-box" href="{% url 'scheduling:week' %}"><span>Turnos de hoy</span><strong>{{ today_shifts|length }}</strong></a>
+        <a class="metric-box warning" href="{% url 'leaves:list' %}"><span>Solicitudes pendientes</span><strong>{{ pending_leaves }}</strong></a>
+        <a class="metric-box warning" href="{% url 'incidents:list' %}"><span>Incidencias pendientes</span><strong>{{ pending_incidents }}</strong></a>
+    </div>
+
+    <div class="dashboard-grid mt-3">
+        <section class="surface">
+            <div class="section-heading">
+                <div><h2>Requiere atención</h2><p>Personas con turno iniciado que todavía no han fichado.</p></div>
+            </div>
+            <div class="item-list">
+                {% for shift in missing_clock_ins %}
+                    <div class="list-row">
+                        <div><strong>{{ shift.employee.full_name }}</strong><span>{{ shift.get_position_display }} · turno desde {{ shift.start_time|time:"H:i" }}</span></div>
+                        <a class="btn btn-sm btn-outline-primary" href="{% url 'timeclock:manual-create' %}">Revisar</a>
+                    </div>
+                {% empty %}
+                    <div class="empty-state compact">No hay fichajes de entrada pendientes.</div>
+                {% endfor %}
+            </div>
+        </section>
+        <section class="surface">
+            <div class="section-heading">
+                <div><h2>Turnos de hoy</h2><p>{{ today_shifts|length }} turnos planificados.</p></div>
+                <a href="{% url 'scheduling:week' %}">Ver semana</a>
+            </div>
+            <div class="item-list">
+                {% for shift in today_shifts %}
+                    <div class="list-row">
+                        <div><strong>{{ shift.employee.full_name }}</strong><span>{{ shift.get_position_display }}</span></div>
+                        <span>{{ shift.start_time|time:"H:i" }} - {{ shift.end_time|time:"H:i" }}</span>
+                    </div>
+                {% empty %}
+                    <div class="empty-state compact">No hay turnos hoy.</div>
+                {% endfor %}
+            </div>
+        </section>
+        <section class="surface">
+            <div class="section-heading">
+                <div><h2>Fichajes abiertos</h2><p>Trabajadores que constan dentro.</p></div>
+                <a href="{% url 'timeclock:history' %}">Ver fichajes</a>
+            </div>
+            <div class="item-list">
+                {% for entry in open_clock_entries %}
+                    <div class="list-row"><strong>{{ entry.employee.full_name }}</strong><span>Desde {{ entry.timestamp|date:"H:i" }}</span></div>
+                {% empty %}
+                    <div class="empty-state compact">No hay entradas abiertas.</div>
+                {% endfor %}
+            </div>
+        </section>
+        <section class="surface">
+            <div class="section-heading">
+                <div><h2>Gestión rápida</h2><p>{{ active_employee_count }} empleados activos.</p></div>
+            </div>
+            <div class="action-list">
+                <a href="{% url 'employees:list' %}">Gestionar empleados <span>→</span></a>
+                <a href="{% url 'leaves:list' %}">Revisar solicitudes <span>→</span></a>
+                <a href="{% url 'incidents:list' %}">Resolver incidencias <span>→</span></a>
+                <a href="{% url 'reports:monthly-summary' %}">Abrir pre-nómina <span>→</span></a>
+            </div>
+        </section>
+    </div>
+{% elif role == "trabajador" %}
+    <header class="page-header">
+        <div>
+            <p class="eyebrow">Hoy · {{ today|date:"d/m/Y" }}</p>
+            <h1>Hola, {{ profile.full_name }}</h1>
+            <p>{{ profile.get_primary_position_display }}</p>
+        </div>
+        <a class="btn btn-primary" href="{% url 'timeclock:scan' %}">{% if is_clocked_in %}Fichar salida{% else %}Fichar entrada{% endif %}</a>
+    </header>
+
+    <section class="clock-summary {% if is_clocked_in %}inside{% else %}outside{% endif %}">
+        <div>
+            <span class="status-dot {% if is_clocked_in %}status-dot-ready{% else %}status-dot-neutral{% endif %}"></span>
+            <div>
+                <p>Estado de fichaje</p>
+                <h2>{% if is_clocked_in %}Estás dentro{% else %}Estás fuera{% endif %}</h2>
+            </div>
+        </div>
+        {% if is_clocked_in %}
+            <span>Entrada registrada a las {{ current_entry.timestamp|date:"H:i" }}</span>
+        {% elif current_entry %}
+            <span>Última salida: {{ current_entry.timestamp|date:"d/m H:i" }}</span>
+        {% endif %}
+    </section>
+
+    <div class="metric-grid worker-metrics">
+        <a class="metric-box" href="{% url 'timeclock:hours' %}"><span>Horas este mes</span><strong>{{ month_summary.valid_clocked_hours }} h</strong></a>
+        <a class="metric-box" href="{% url 'leaves:list' %}"><span>Solicitudes pendientes</span><strong>{{ own_pending_leaves }}</strong></a>
+        <a class="metric-box" href="{% url 'incidents:list' %}"><span>Incidencias abiertas</span><strong>{{ own_open_incidents }}</strong></a>
+    </div>
+
+    <div class="dashboard-grid mt-3">
+        <section class="surface next-shift">
+            <div class="section-heading"><div><h2>Próximo turno</h2><p>Tu siguiente horario planificado.</p></div><a href="{% url 'scheduling:week' %}">Mis turnos</a></div>
+            {% if next_shift %}
+                <div class="next-shift-content">
+                    <div class="date-block"><strong>{{ next_shift.date|date:"d" }}</strong><span>{{ next_shift.date|date:"M"|upper }}</span></div>
+                    <div><h3>{{ next_shift.start_time|time:"H:i" }} - {{ next_shift.end_time|time:"H:i" }}</h3><p>{{ next_shift.get_position_display }} · {{ next_shift.planned_duration_hours|floatformat:1 }} h</p></div>
+                </div>
+            {% else %}
+                <div class="empty-state compact">No tienes próximos turnos planificados.</div>
+            {% endif %}
+        </section>
+        <section class="surface">
+            <div class="section-heading"><div><h2>Acciones</h2><p>Gestiones habituales.</p></div></div>
+            <div class="action-list">
+                <a href="{% url 'leaves:create-typed' 'vacation' %}">Solicitar vacaciones <span>→</span></a>
+                <a href="{% url 'leaves:create-typed' 'day_off' %}">Solicitar día libre <span>→</span></a>
+                <a href="{% url 'incidents:create' %}">Reportar error de fichaje <span>→</span></a>
+                <a href="{% url 'timeclock:history' %}">Consultar mis fichajes <span>→</span></a>
+            </div>
+        </section>
+    </div>
+{% else %}
+    <div class="alert alert-warning">Tu usuario todavía no tiene una ficha de empleado activa. Un administrador debe completarla.</div>
+{% endif %}
+{% endblock %}
