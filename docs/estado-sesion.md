@@ -19,16 +19,16 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Fase cerrada: `fase-integridad-relaciones-operativas` (fase 6), sin migracion nueva.
-- Siguiente fase: `fase-admin-tenant-scope` (fase 7).
-- Auditar acceso de staff/superusers al admin, elegir aislamiento por empresa o reserva a superuser tecnico, y probar listado/detalle/escrituras/autocompletado.
-- Mantener acceso operativo del administrador de empresa desde las vistas de cliente; no habilitar un panel global para staff sin contexto.
-- No adelantar workplace/QR/IP ni auditoria de logs antes de cerrar la fase 7.
-- La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias.
+- Fase cerrada: `fase-admin-tenant-scope` (fase 7), con Django Admin reservado a superusuario tecnico.
+- Siguiente fase tecnica: `fase-workplace-operativo-y-qr-ip-por-centro` (fase 8).
+- Auditar centros y su empresa en empleados, turnos y fichajes, y configuracion real de QR/IP antes de cambiar el contexto operativo. Elegir y probar el centro del turno/fichaje dentro de la empresa autorizada.
+- Implementar centro en formularios/admin, preservarlo al copiar/duplicar turnos y validar fichajes contra Workplace; no endurecer centros a NOT NULL sin auditoria especifica.
+- Antes de iniciar esta fase mas amplia, comprobar con el usuario el cupo restante: ha pedido aproximarse al 40%, pero el agente no puede consultar /status. Se ha solicitado el porcentaje durante el trabajo.
+- La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias. No se han localizado ni migrado sus datos.
 
 ## Estado Actual Del Proyecto
 
-- Fase cerrada: `fase-integridad-relaciones-operativas`; 185 tests OK. Baseline anterior: `fd0487c` (lineas de payroll).
+- Fase cerrada: `fase-admin-tenant-scope`; 192 tests OK. Baseline anterior: `8f333d2` (integridad operativa).
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
 - Cada fase cerrada dispone de su commit local con codigo, tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
@@ -42,12 +42,14 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - `EmployeeProfile.primary_workplace`, `Shift.workplace` y `TimeClockEntry.workplace` siguen nullable y fuera del siguiente paso.
 - Admin operativo sin `company` esta cerrado en vistas cliente.
 - Staff/superuser sin perfil no tiene panel operativo global de cliente.
-- Django Admin tecnico aun no esta aislado por tenant.
+- Django Admin global queda reservado a superusuarios tecnicos activos y staff; los usuarios staff sin superuser no acceden, aunque tengan permisos de modelos.
 - `BusinessConfig` sigue siendo global para QR/IP/mantenimiento.
 - `docs/multiempresa-diagnostico.md` es historico/obsoleto y no debe usarse como estado actual.
 - `docs/hardening-company-not-null-plan.md` es plan historico de la primera etapa; la fuente viva es este archivo.
 
 ## Ultima Auditoria De Datos
+
+Auditoria de acceso local 2026-10-16 antes de fase 7: staff 0, staff sin superuser 0, superusers 0. La politica anterior permitia has_permission a cualquier usuario activo staff; la nueva exige tambien superuser. No se han creado, borrado ni modificado cuentas locales.
 
 Auditoria ORM local 2026-10-16 antes de fase 6: Incident total 0, LeaveRequest total 0; diferencias de empresa con empleados, turno y fichaje 0; turno/empleado e incidencia/fichaje/empleado 0; empresa de revisor/resolutor 0; centro/empresa del empleado 0. Sin saneamiento ni cambio de esquema.
 
@@ -85,6 +87,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Fase `fase-admin-tenant-scope`, 2026-10-16: tests `core.test_admin_access payroll` 35 OK; suite completa 192 OK; check/makemigrations/diff OK. Sin migracion nueva; sin cambios pendientes de esquema.
 
 Fase `fase-integridad-relaciones-operativas`, 2026-10-16: tests `employees leaves incidents payroll timeclock dashboard` 129 OK, nuevos tests `core.test_integrity` 9 OK; suite completa 185 OK; check/makemigrations/diff OK. Sin migraciones nuevas.
 
@@ -184,6 +188,9 @@ Validaciones historicas relevantes:
 
 ## Invariantes Cerradas
 
+- Django Admin es exclusivamente tecnico: requiere is_active, is_staff e is_superuser, tanto en login como en cada vista incluida la de autocompletado y los endpoints personalizados registrados con admin_view.
+- Los administradores de empresa usan vistas cliente limitadas a su empresa. Superusuarios tecnicos conservan acceso global explicito al admin.
+
 - Incidencias solo se enlazan a turnos/fichajes del mismo empleado y empresa; save() valida los datos.
 - Revisores y resolutores con perfil pertenecen a la empresa del registro. El tecnico sin perfil puede operar desde herramientas autorizadas.
 - review()/resolve() bloquean la fila y comprueban que sigue pendiente antes de actuar; rechazan instancias obsoletas y revisiones repetidas. Las vistas devuelven mensajes de error sin sobrescribir datos.
@@ -216,7 +223,6 @@ Validaciones historicas relevantes:
 
 - `workplace` todavia no es una invariante fuerte.
 - QR/IP por fichaje siguen en `BusinessConfig` global y deben moverse a `Workplace` en una fase posterior.
-- Django Admin no esta filtrado por tenant.
 - `AuditLog` no guarda `company` ni `workplace`.
 - `reports` y `dashboard` conservan side effects en GET.
 
@@ -250,6 +256,7 @@ Validaciones historicas relevantes:
 - `fase-hardening-payrolldraft-company-not-null`: migracion `payroll.0006`, validacion al guardar y 170 tests OK.
 - `fase-hardening-payrolldraftline-company-not-null`: migracion `payroll.0007`, coherencia de las lineas y 176 tests OK.
 - `fase-integridad-relaciones-operativas`: relaciones y cambios de empresa protegidos, acciones pendientes verificadas y 185 tests OK.
+- `fase-admin-tenant-scope`: opcion de reserva a superusuario tecnico, acceso/login centralizado y 192 tests OK.
 
 ## Hoja De Ruta Priorizada
 
@@ -423,11 +430,10 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 
 ## Deudas Pendientes Importantes
 
-- Ejecutar `fase-admin-tenant-scope`.
+- Ejecutar `fase-workplace-operativo-y-qr-ip-por-centro` tras revisar el cupo restante con el usuario.
 - Decidir cuando endurecer `workplace` a no nullable por modelo.
 - Mover configuracion QR/IP desde `BusinessConfig` global a `Workplace`.
 - Decidir si hace falta panel operativo global interno para staff/superuser y como evitar que cree datos con `company=NULL`.
-- Aislar Django Admin por tenant o reservarlo a superuser tecnico.
 - Anadir contexto `company`/`workplace` a `AuditLog` cuando aplique.
 - Actualizar o archivar documentacion obsoleta.
 
@@ -520,3 +526,13 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - Tests de payroll que simulan datos historicos corruptos usan bulk_create de forma explicita; las rutas normales de guardado ya rechazan esas discrepancias.
 - Tests existentes relacionados: 129 OK; nuevos de integridad: 9 OK; suite global: 185 OK; check/makemigrations/diff OK. Se corrigio la carga del POST de una prueba nueva para enviar un formulario vinculado antes de la regresion completa.
 - Commit local: `fase-integridad-relaciones-operativas`. Siguiente: aislamiento de Django Admin.
+
+## Cierre 2026-10-16 - Administrador Global Reservado A Tecnicos
+
+- Elegida la opcion prevista en la fase 7 de reservar Django Admin a superusuario tecnico; no se ha habilitado un admin global para cuentas de empresa.
+- Configuracion mediante AdminConfig.default_site y TechnicalAdminSite.has_permission, sin monkeypatch ni registros de modelos duplicados. Login especializado rechaza staff sin superuser con error visible.
+- La barrera central cubre cada modelo registrado, GET/POST de altas/cambios/borrados, historial, autocompletado y endpoint personalizado de QR. Los permisos de modelos no la evitan.
+- Auditoria previa: ninguna cuenta staff/superuser en la base local nueva. No se han alterado cuentas existentes. README documenta requisitos y createsuperuser para entornos nuevos.
+- Tests prueban todos los modelos registrados con staff que tiene todos los permisos; prueban tambien staff sin perfil, login denegado, ausencia de escrituras, QR sin cambios, acceso global tecnico y acceso normal de administrador de empresa limitado a su empresa.
+- Tests relacionados: 35 OK; globales: 192 OK; check/makemigrations/diff OK. Sin cambios de esquema.
+- Commit local: `fase-admin-tenant-scope`. Siguiente: Workplace operativo y QR/IP por centro; pendiente conocer el cupo de uso para respetar el limite solicitado por el usuario.

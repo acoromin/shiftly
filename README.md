@@ -12,6 +12,18 @@ python manage.py runserver
 
 La aplicación estará disponible en `http://127.0.0.1:8000/`.
 
+## Acceso al administrador técnico
+
+`/administracion/` está reservado a superusuarios técnicos activos con `is_staff=True`.
+El permiso `is_staff` y los permisos individuales de modelos no bastan para acceder.
+Los administradores de empresa gestionan empleados, turnos, fichajes e informes desde las pantallas normales, limitadas a su empresa.
+
+Para crear una cuenta técnica en un entorno local nuevo:
+
+```bash
+./.venv/bin/python manage.py createsuperuser
+```
+
 ## Ventana de mantenimiento
 
 El bar cierra los lunes. Por ese motivo, el lunes es el día recomendado para actualizaciones, migraciones, comprobaciones y copias de seguridad.
