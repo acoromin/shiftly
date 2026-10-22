@@ -24,6 +24,18 @@ Para crear una cuenta técnica en un entorno local nuevo:
 ./.venv/bin/python manage.py createsuperuser
 ```
 
+## Centros y fichaje por QR
+
+Cada empleado puede tener un centro principal y cada turno puede indicar su centro. Al duplicar o copiar un turno se conserva el centro del turno original. El fichaje usa el centro del turno activo; si no hay turno activo con centro, el QR identifica un centro activo de la empresa del empleado. La IP pública debe coincidir con la configurada en ese centro.
+
+El superusuario técnico puede configurar la IP en `/administracion/companies/workplace/` y generar un QR desde la acción **Generar QR para los centros seleccionados**. La URL resultante se muestra una sola vez y debe guardarse para imprimir el QR. También puede configurarse desde consola:
+
+```bash
+./.venv/bin/python manage.py setup_xarlot_clock --workplace-id ID --wifi-ip IP_PUBLICA --base-url https://tu-dominio
+```
+
+Los campos QR/IP antiguos de `BusinessConfig` ya no autorizan fichajes. La migración `companies.0003` copia sus valores a un centro cuando existe uno solo; con varios centros, configura cada uno explícitamente antes de usar sus QR.
+
 ## Ventana de mantenimiento
 
 El bar cierra los lunes. Por ese motivo, el lunes es el día recomendado para actualizaciones, migraciones, comprobaciones y copias de seguridad.

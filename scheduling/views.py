@@ -32,16 +32,16 @@ def _resolve_shift_context(employee, fallback_shift=None):
     workplace = None
     if company:
         if (
-            employee.primary_workplace_id
-            and employee.primary_workplace.company_id == company.pk
-        ):
-            workplace = employee.primary_workplace
-        elif (
             fallback_shift
             and fallback_shift.workplace_id
             and fallback_shift.workplace.company_id == company.pk
         ):
             workplace = fallback_shift.workplace
+        elif (
+            employee.primary_workplace_id
+            and employee.primary_workplace.company_id == company.pk
+        ):
+            workplace = employee.primary_workplace
     elif fallback_shift and fallback_shift.company_id:
         company = fallback_shift.company
         if (
@@ -53,7 +53,9 @@ def _resolve_shift_context(employee, fallback_shift=None):
 
 
 def _apply_shift_context(shift, fallback_shift=None):
-    shift.company, shift.workplace = _resolve_shift_context(shift.employee, fallback_shift)
+    shift.company, inferred_workplace = _resolve_shift_context(shift.employee, fallback_shift)
+    if not shift.workplace_id:
+        shift.workplace = inferred_workplace
     return shift
 
 
@@ -195,6 +197,7 @@ def duplicate_shift(request, pk):
         planned_break_minutes=original.planned_break_minutes,
         position=original.position,
         notes=original.notes,
+        workplace=original.workplace,
         created_by=request.user,
         modified_by=request.user,
     )
@@ -244,6 +247,7 @@ def copy_previous_week(request):
             planned_break_minutes=shift.planned_break_minutes,
             position=shift.position,
             notes=shift.notes,
+            workplace=shift.workplace,
             created_by=request.user,
             modified_by=request.user,
         )

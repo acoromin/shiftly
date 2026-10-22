@@ -235,13 +235,14 @@ class ShiftTests(TestCase):
         self.assertContains(response, '8,00 h planificadas')
         self.assertNotContains(response, '16:00 - 23:00')
 
-    def test_django_admin_exposes_company_without_workplace(self):
+    def test_django_admin_exposes_company_and_workplace(self):
         model_admin = admin.site._registry[Shift]
         fields = [field for _name, options in model_admin.fieldsets for field in options['fields']]
 
         self.assertIn('company', fields)
         self.assertIn('company', model_admin.autocomplete_fields)
-        self.assertNotIn('workplace', fields)
+        self.assertIn('workplace', fields)
+        self.assertIn('workplace', model_admin.autocomplete_fields)
 
     def test_admin_week_view_shows_team_shifts(self):
         company, _workplace = self.set_employee_context()
@@ -605,12 +606,13 @@ class ShiftTests(TestCase):
 
     def test_duplicate_shift_saves_employee_company_and_workplace(self):
         company, workplace = self.set_employee_context()
+        selected_workplace = Workplace.objects.create(company=company, name='Centro alternativo')
         self.employee.role = EmployeeProfile.Role.ADMIN
         self.employee.save(update_fields=['role'])
         shift = Shift.objects.create(
             employee=self.employee,
             company=company,
-            workplace=workplace,
+            workplace=selected_workplace,
             date=date(2026, 6, 23),
             start_time=time(8, 0),
             end_time=time(16, 0),
@@ -622,7 +624,7 @@ class ShiftTests(TestCase):
         self.assertEqual(response.status_code, 302)
         duplicate = Shift.objects.get(employee=self.employee, date=date(2026, 6, 30))
         self.assertEqual(duplicate.company, company)
-        self.assertEqual(duplicate.workplace, workplace)
+        self.assertEqual(duplicate.workplace, selected_workplace)
 
     def test_admin_with_company_cannot_duplicate_other_company_shift(self):
         self.set_employee_context()
@@ -717,12 +719,13 @@ class ShiftTests(TestCase):
 
     def test_copy_previous_week_saves_employee_company_and_workplace(self):
         company, workplace = self.set_employee_context()
+        selected_workplace = Workplace.objects.create(company=company, name='Centro alternativo')
         self.employee.role = EmployeeProfile.Role.ADMIN
         self.employee.save(update_fields=['role'])
         Shift.objects.create(
             employee=self.employee,
             company=company,
-            workplace=workplace,
+            workplace=selected_workplace,
             date=date(2026, 6, 23),
             start_time=time(8, 0),
             end_time=time(16, 0),
@@ -734,7 +737,36 @@ class ShiftTests(TestCase):
         self.assertEqual(response.status_code, 302)
         copied = Shift.objects.get(employee=self.employee, date=date(2026, 6, 30))
         self.assertEqual(copied.company, company)
-        self.assertEqual(copied.workplace, workplace)
+        self.assertEqual(copied.workplace, selected_workplace)
+
+    def test_shift_form_limits_workplaces_and_preserves_selected_workplace(self):
+        company, primary = self.set_employee_context()
+        selected = Workplace.objects.create(company=company, name='Centro alternativo')
+        foreign_company = Company.objects.create(name='Empresa B')
+        foreign = Workplace.objects.create(company=foreign_company, name='Centro externo')
+        self.employee.role = EmployeeProfile.Role.ADMIN
+        self.employee.save(update_fields=['role'])
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('scheduling:create'))
+        choices = response.context['form'].fields['workplace'].queryset
+        self.assertIn(primary, choices)
+        self.assertIn(selected, choices)
+        self.assertNotIn(foreign, choices)
+        payload = {
+            'employee': self.employee.pk, 'workplace': selected.pk, 'date': '2026-06-23',
+            'start_time': '08:00', 'end_time': '16:00', 'planned_break_minutes': '0',
+            'position': Shift.Position.WAITER, 'notes': '',
+        }
+        self.assertRedirects(self.client.post(reverse('scheduling:create'), payload), reverse('scheduling:week'))
+        self.assertEqual(Shift.objects.get(employee=self.employee).workplace, selected)
+
+        payload['workplace'] = foreign.pk
+        payload['date'] = '2026-06-24'
+        response = self.client.post(reverse('scheduling:create'), payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('workplace', response.context['form'].errors)
+        self.assertFalse(Shift.objects.filter(date=date(2026, 6, 24)).exists())
 
     def test_copy_previous_week_with_company_does_not_copy_other_company_shifts(self):
         company, workplace = self.set_employee_context()

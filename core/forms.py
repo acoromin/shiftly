@@ -9,7 +9,6 @@ class BusinessConfigForm(forms.ModelForm):
         model = BusinessConfig
         fields = (
             'name',
-            'public_wifi_ip',
             'clock_tolerance_minutes',
             'maintenance_enabled',
             'maintenance_scheduled_start',

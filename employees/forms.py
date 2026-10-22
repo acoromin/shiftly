@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import password_validation
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from companies.models import Workplace
 
 from .models import EmployeeProfile
 
@@ -30,6 +31,7 @@ class EmployeeForm(forms.ModelForm):
             'start_date',
             'end_date',
             'role',
+            'primary_workplace',
             'primary_position',
             'contract_type',
             'weekly_contracted_hours',
@@ -43,8 +45,11 @@ class EmployeeForm(forms.ModelForm):
             'internal_notes': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, user_instance=None, **kwargs):
+    def __init__(self, *args, user_instance=None, company=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['primary_workplace'].queryset = Workplace.objects.filter(company=company, is_active=True) if company else Workplace.objects.none()
+        if company is not None:
+            self.instance.company = company
         self.user_instance = user_instance
         if user_instance:
             self.fields['username'].initial = user_instance.username

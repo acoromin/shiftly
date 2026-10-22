@@ -16,10 +16,9 @@
     {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
 
     <section class="form-section">
-        <h2>Negocio y fichajes</h2>
+        <h2>Negocio</h2>
         <div class="form-grid">
             {% include "shared/form_field.html" with field=form.name %}
-            {% include "shared/form_field.html" with field=form.public_wifi_ip %}
             {% include "shared/form_field.html" with field=form.clock_tolerance_minutes %}
         </div>
     </section>

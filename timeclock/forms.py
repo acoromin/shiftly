@@ -2,6 +2,7 @@ from django import forms
 from django.utils import timezone
 
 from employees.selectors import active_employees_for_company
+from companies.models import Workplace
 
 from .models import TimeClockEntry
 
@@ -9,7 +10,7 @@ from .models import TimeClockEntry
 class ManualTimeClockEntryForm(forms.ModelForm):
     class Meta:
         model = TimeClockEntry
-        fields = ('employee', 'entry_type', 'timestamp', 'manual_reason')
+        fields = ('employee', 'workplace', 'entry_type', 'timestamp', 'manual_reason')
         widgets = {
             'timestamp': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'manual_reason': forms.Textarea(attrs={'rows': 3}),
@@ -18,6 +19,7 @@ class ManualTimeClockEntryForm(forms.ModelForm):
     def __init__(self, *args, company=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['employee'].queryset = active_employees_for_company(company)
+        self.fields['workplace'].queryset = Workplace.objects.filter(company=company, is_active=True) if company else Workplace.objects.none()
         # company is intentionally excluded from the customer-facing form.
         # Set it before ModelForm runs the model's cross-company validation.
         if company is not None:

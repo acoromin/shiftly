@@ -19,16 +19,15 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Fase cerrada: `fase-admin-tenant-scope` (fase 7), con Django Admin reservado a superusuario tecnico.
-- Siguiente fase tecnica: `fase-workplace-operativo-y-qr-ip-por-centro` (fase 8).
-- Auditar centros y su empresa en empleados, turnos y fichajes, y configuracion real de QR/IP antes de cambiar el contexto operativo. Elegir y probar el centro del turno/fichaje dentro de la empresa autorizada.
-- Implementar centro en formularios/admin, preservarlo al copiar/duplicar turnos y validar fichajes contra Workplace; no endurecer centros a NOT NULL sin auditoria especifica.
-- Antes de iniciar esta fase mas amplia, comprobar con el usuario el cupo restante: ha pedido aproximarse al 40%, pero el agente no puede consultar /status. Se ha solicitado el porcentaje durante el trabajo.
+- Fase cerrada: `fase-workplace-operativo-y-qr-ip-por-centro` (fase 8).
+- Siguiente fase tecnica: `fase-auditlog-y-documentacion-tenant-aware` (fase 9).
+- Auditar `AuditLog` y sus creadores/lectores antes de anadir contexto de empresa/centro; definir la relacion con eventos globales de mantenimiento.
+- La base original sigue sin localizarse: si aparece, hacer copia y auditoria propias antes de aplicar migraciones.
 - La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias. No se han localizado ni migrado sus datos.
 
 ## Estado Actual Del Proyecto
 
-- Fase cerrada: `fase-admin-tenant-scope`; 192 tests OK. Baseline anterior: `8f333d2` (integridad operativa).
+- Fase cerrada: `fase-workplace-operativo-y-qr-ip-por-centro`; validaciones del cierre detalladas al final. Baseline anterior: `2241590` (admin tecnico).
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
 - Cada fase cerrada dispone de su commit local con codigo, tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
@@ -39,11 +38,11 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - `MonthlyHoursSummary.company` es obligatorio y coherente con el empleado; `payroll.0005` aplicada localmente.
 - `PayrollDraft.company` es obligatorio; `payroll.0006` aplicada. Los borradores con lineas no se pueden mover a una empresa incompatible.
 - `PayrollDraftLine.company` es obligatorio y coincide con empleado y borrador; `payroll.0007` aplicada.
-- `EmployeeProfile.primary_workplace`, `Shift.workplace` y `TimeClockEntry.workplace` siguen nullable y fuera del siguiente paso.
+- `EmployeeProfile.primary_workplace`, `Shift.workplace` y `TimeClockEntry.workplace` siguen nullable; los formularios operativos permiten elegir centros activos de la empresa autorizada.
 - Admin operativo sin `company` esta cerrado en vistas cliente.
 - Staff/superuser sin perfil no tiene panel operativo global de cliente.
 - Django Admin global queda reservado a superusuarios tecnicos activos y staff; los usuarios staff sin superuser no acceden, aunque tengan permisos de modelos.
-- `BusinessConfig` sigue siendo global para QR/IP/mantenimiento.
+- `BusinessConfig` sigue siendo global para mantenimiento. Sus campos QR/IP antiguos permanecen en el esquema, pero no autorizan fichajes. El fichaje usa QR/IP de `Workplace`.
 - `docs/multiempresa-diagnostico.md` es historico/obsoleto y no debe usarse como estado actual.
 - `docs/hardening-company-not-null-plan.md` es plan historico de la primera etapa; la fuente viva es este archivo.
 
@@ -87,6 +86,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Fase `fase-workplace-operativo-y-qr-ip-por-centro`, 2026-10-22: tests relacionados 124 OK antes de cerrar los casos de QR/turno adicionales; suite completa 203 OK; `check`, `makemigrations --check --dry-run` y `git diff --check` OK; `companies.0003` aplicada a la base local.
 
 Fase `fase-admin-tenant-scope`, 2026-10-16: tests `core.test_admin_access payroll` 35 OK; suite completa 192 OK; check/makemigrations/diff OK. Sin migracion nueva; sin cambios pendientes de esquema.
 
@@ -430,9 +431,8 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 
 ## Deudas Pendientes Importantes
 
-- Ejecutar `fase-workplace-operativo-y-qr-ip-por-centro` tras revisar el cupo restante con el usuario.
 - Decidir cuando endurecer `workplace` a no nullable por modelo.
-- Mover configuracion QR/IP desde `BusinessConfig` global a `Workplace`.
+- Definir administracion de centros por administradores de empresa si se necesita autoservicio; hoy la configuracion QR/IP se hace en Django Admin tecnico o por comando.
 - Decidir si hace falta panel operativo global interno para staff/superuser y como evitar que cree datos con `company=NULL`.
 - Anadir contexto `company`/`workplace` a `AuditLog` cuando aplique.
 - Actualizar o archivar documentacion obsoleta.
@@ -536,3 +536,14 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - Tests prueban todos los modelos registrados con staff que tiene todos los permisos; prueban tambien staff sin perfil, login denegado, ausencia de escrituras, QR sin cambios, acceso global tecnico y acceso normal de administrador de empresa limitado a su empresa.
 - Tests relacionados: 35 OK; globales: 192 OK; check/makemigrations/diff OK. Sin cambios de esquema.
 - Commit local: `fase-admin-tenant-scope`. Siguiente: Workplace operativo y QR/IP por centro; pendiente conocer el cupo de uso para respetar el limite solicitado por el usuario.
+
+## Cierre 2026-10-22 - Centro Operativo Y QR/IP Por Centro
+
+- Antes de esta fase se subieron a `origin/main` los siete commits locales de las fases anteriores (`ccfe280..2241590`); el usuario autorizo continuar con fase 8.
+- Auditoria ORM local: 1 empresa, 1 centro, 0 empleados, 0 turnos, 0 fichajes; 0 QR e IP configurados tanto en Workplace como en BusinessConfig. Discrepancias centro/empresa en empleados, turnos y fichajes: 0. La base original externa sigue sin localizarse.
+- Formularios de empleado, turno y fichaje manual exponen centros activos de la empresa autorizada. Admin tecnico muestra los centros en empleado, turno y fichaje; puede configurar IP y generar QR por centro. El comando `setup_xarlot_clock` exige `--workplace-id`.
+- Los turnos nuevos admiten centro explicito; duplicar y copiar semana preservan el centro original aunque difiera del centro principal del empleado. El fichaje por QR detecta el turno activo y exige su centro si existe. En ausencia de un turno con centro, el QR identifica un unico centro activo de la empresa. Una IP distinta, un QR de otra empresa, un QR duplicado entre centros o un centro inactivo no autorizan el fichaje.
+- La configuracion global de QR/IP se ha retirado de los formularios/admin operativos y no participa en la autorizacion. `companies.0003` copia credenciales globales antiguas cuando solo hay un centro y este carece de ellas; con varios centros no adivina el destino. Los campos antiguos de BusinessConfig siguen en el esquema para compatibilidad historica.
+- No se ha impuesto `workplace NOT NULL` ni cambiado el esquema de sus tres relaciones. Copia previa local: `backups/shiftly-pre-workplace-20261022.sqlite3`; migracion `companies.0003` aplicada.
+- Pruebas especificas de aislamiento de centros, QR/IP por centro, turno activo, copia/duplicacion y migracion de credenciales incorporadas. Suite completa: 203 tests OK; `check`, `makemigrations --check --dry-run` y `git diff --check` OK.
+- Siguiente fase: `fase-auditlog-y-documentacion-tenant-aware`.

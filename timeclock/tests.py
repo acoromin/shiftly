@@ -34,6 +34,9 @@ class TimeClockTests(TestCase):
         self.config.public_wifi_ip = '203.0.113.10'
         self.config.set_qr_token('valid-token')
         self.config.save()
+        self.workplace = Workplace.objects.create(company=self.company, name='Centro base', public_wifi_ip='203.0.113.10')
+        self.workplace.set_qr_token('valid-token')
+        self.workplace.save(update_fields=['qr_token_hash'])
         self.factory = RequestFactory()
 
     def request(self, ip='203.0.113.10'):
@@ -45,6 +48,9 @@ class TimeClockTests(TestCase):
         employee = employee or self.employee
         company = Company.objects.create(name=company_name)
         workplace = Workplace.objects.create(company=company, name=workplace_name)
+        workplace.public_wifi_ip = '203.0.113.10'
+        workplace.set_qr_token('valid-token')
+        workplace.save(update_fields=['public_wifi_ip', 'qr_token_hash'])
         employee.company = company
         employee.primary_workplace = workplace
         employee.save(update_fields=['company', 'primary_workplace'])
@@ -101,6 +107,9 @@ class TimeClockTests(TestCase):
     def test_valid_clock_prefers_related_shift_workplace(self):
         company, _employee_workplace = self.set_employee_context()
         shift_workplace = Workplace.objects.create(company=company, name='Centro turno')
+        shift_workplace.public_wifi_ip = '203.0.113.10'
+        shift_workplace.set_qr_token('shift-token')
+        shift_workplace.save(update_fields=['public_wifi_ip', 'qr_token_hash'])
         shift = Shift.objects.create(
             employee=self.employee,
             company=company,
@@ -110,7 +119,7 @@ class TimeClockTests(TestCase):
             end_time=time(16, 0),
         )
 
-        ok, _message, entry = attempt_clock(self.request(), self.employee, 'valid-token', related_shift=shift)
+        ok, _message, entry = attempt_clock(self.request(), self.employee, 'shift-token', related_shift=shift)
 
         self.assertTrue(ok)
         self.assertEqual(entry.related_shift, shift)
@@ -397,6 +406,8 @@ class TimeClockTests(TestCase):
         self.assertEqual(incident.company, company)
 
     def test_blocks_invalid_qr(self):
+        self.employee.primary_workplace = self.workplace
+        self.employee.save(update_fields=['primary_workplace'])
         request = self.factory.post('/fichar/', {'token': 'bad-token'}, REMOTE_ADDR='203.0.113.10')
         request.user = self.user
 
@@ -414,6 +425,91 @@ class TimeClockTests(TestCase):
         self.assertEqual(message, 'Debes estar conectado al WiFi del bar para fichar.')
         self.assertEqual(entry.status, TimeClockEntry.Status.BLOCKED_IP)
         self.assertEqual(entry.company, self.company)
+
+    def test_global_qr_and_ip_do_not_authorize_clock(self):
+        self.employee.primary_workplace = self.workplace
+        self.employee.save(update_fields=['primary_workplace'])
+        self.config.set_qr_token('global-only')
+        self.config.public_wifi_ip = '198.51.100.7'
+        self.config.save()
+
+        ok, _message, entry = attempt_clock(self.request(ip='198.51.100.7'), self.employee, 'global-only')
+
+        self.assertFalse(ok)
+        self.assertEqual(entry.status, TimeClockEntry.Status.INVALID_QR)
+        self.assertEqual(entry.workplace, self.workplace)
+
+    def test_qr_selects_its_company_workplace_and_uses_its_ip(self):
+        other = Workplace.objects.create(company=self.company, name='Otro centro', public_wifi_ip='198.51.100.7')
+        other.set_qr_token('other-token')
+        other.save(update_fields=['qr_token_hash'])
+
+        blocked, _message, blocked_entry = attempt_clock(self.request(), self.employee, 'other-token')
+        allowed, _message, allowed_entry = attempt_clock(self.request(ip='198.51.100.7'), self.employee, 'other-token')
+
+        self.assertFalse(blocked)
+        self.assertEqual(blocked_entry.status, TimeClockEntry.Status.BLOCKED_IP)
+        self.assertEqual(blocked_entry.workplace, other)
+        self.assertTrue(allowed)
+        self.assertEqual(allowed_entry.workplace, other)
+
+    def test_qr_from_other_company_is_invalid(self):
+        self.employee.primary_workplace = self.workplace
+        self.employee.save(update_fields=['primary_workplace'])
+        foreign_company = Company.objects.create(name='Empresa externa')
+        foreign = Workplace.objects.create(company=foreign_company, name='Centro externo', public_wifi_ip='203.0.113.10')
+        foreign.set_qr_token('foreign-token')
+        foreign.save(update_fields=['qr_token_hash'])
+
+        ok, _message, entry = attempt_clock(self.request(), self.employee, 'foreign-token')
+
+        self.assertFalse(ok)
+        self.assertEqual(entry.status, TimeClockEntry.Status.INVALID_QR)
+        self.assertEqual(entry.workplace, self.workplace)
+
+    def test_duplicate_qr_across_workplaces_is_rejected_without_shift(self):
+        duplicate = Workplace.objects.create(company=self.company, name='Centro duplicado', public_wifi_ip='203.0.113.10')
+        duplicate.set_qr_token('valid-token')
+        duplicate.save(update_fields=['qr_token_hash'])
+
+        ok, _message, entry = attempt_clock(self.request(), self.employee, 'valid-token')
+
+        self.assertFalse(ok)
+        self.assertIsNone(entry)
+        self.assertFalse(TimeClockEntry.objects.exists())
+
+    def test_shift_rejects_qr_for_another_workplace(self):
+        other = Workplace.objects.create(company=self.company, name='Otro centro', public_wifi_ip='203.0.113.10')
+        other.set_qr_token('other-token')
+        other.save(update_fields=['qr_token_hash'])
+        shift = Shift.objects.create(employee=self.employee, company=self.company, workplace=other,
+                                     date=date(2026, 6, 23), start_time=time(8), end_time=time(16))
+
+        ok, _message, entry = attempt_clock(self.request(), self.employee, 'valid-token', related_shift=shift)
+
+        self.assertFalse(ok)
+        self.assertEqual(entry.status, TimeClockEntry.Status.INVALID_QR)
+        self.assertEqual(entry.workplace, other)
+
+    def test_active_shift_workplace_takes_precedence_on_scan(self):
+        other = Workplace.objects.create(company=self.company, name='Centro del turno', public_wifi_ip='203.0.113.10')
+        other.set_qr_token('shift-token')
+        other.save(update_fields=['qr_token_hash'])
+        now = timezone.localtime()
+        start = now - timedelta(minutes=30)
+        end = now + timedelta(minutes=30)
+        shift = Shift.objects.create(employee=self.employee, company=self.company, workplace=other,
+                                     date=start.date(), start_time=start.time(), end_time=end.time())
+
+        wrong, _message, wrong_entry = attempt_clock(self.request(), self.employee, 'valid-token')
+        right, _message, right_entry = attempt_clock(self.request(), self.employee, 'shift-token')
+
+        self.assertFalse(wrong)
+        self.assertEqual(wrong_entry.workplace, other)
+        self.assertEqual(wrong_entry.related_shift, shift)
+        self.assertTrue(right)
+        self.assertEqual(right_entry.workplace, other)
+        self.assertEqual(right_entry.related_shift, shift)
 
     def test_valid_clock_toggles_in_and_out(self):
         ok_in, message_in, entry_in = attempt_clock(self.request(), self.employee, 'valid-token')
@@ -680,12 +776,14 @@ class TimeClockTests(TestCase):
 
     def test_admin_manual_clock_saves_company_and_workplace(self):
         company, workplace = self.set_employee_context()
+        selected = Workplace.objects.create(company=company, name='Centro alternativo')
         self.employee.role = EmployeeProfile.Role.ADMIN
         self.employee.save(update_fields=['role'])
         self.client.force_login(self.user)
 
         response = self.client.post(reverse('timeclock:manual-create'), {
             'employee': self.employee.pk,
+            'workplace': selected.pk,
             'entry_type': TimeClockEntry.EntryType.IN,
             'timestamp': timezone.localtime().strftime('%Y-%m-%dT%H:%M'),
             'manual_reason': 'Fichaje introducido por administrador.',
@@ -694,7 +792,7 @@ class TimeClockTests(TestCase):
         self.assertRedirects(response, reverse('timeclock:history'))
         entry = TimeClockEntry.objects.get(status=TimeClockEntry.Status.MANUAL)
         self.assertEqual(entry.company, company)
-        self.assertEqual(entry.workplace, workplace)
+        self.assertEqual(entry.workplace, selected)
 
     def test_admin_can_correct_entry_with_audit_log(self):
         company, workplace = self.set_employee_context()

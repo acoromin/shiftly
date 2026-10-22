@@ -5,7 +5,7 @@ from django.contrib.auth.models import Permission, User
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from companies.models import Company
+from companies.models import Company, Workplace
 from employees.models import EmployeeProfile
 
 from .models import BusinessConfig
@@ -51,16 +51,18 @@ class TechnicalAdminAccessTests(TestCase):
         self.client.force_login(staff)
         self.assert_admin_login_redirect(self.client.get(reverse('admin:index')))
 
-    def test_staff_cannot_query_autocomplete_or_generate_global_qr(self):
-        config = BusinessConfig.get_solo()
-        old_hash = config.qr_static_token_hash
+    def test_staff_cannot_query_autocomplete_or_generate_workplace_qr(self):
+        workplace = Workplace.objects.create(company=self.company, name='Centro')
+        old_hash = workplace.qr_token_hash
         self.client.force_login(self.staff)
         self.assert_admin_login_redirect(self.client.get(reverse('admin:autocomplete'), {
             'app_label': 'employees', 'model_name': 'employeeprofile', 'field_name': 'company', 'term': 'Empresa',
         }))
-        self.assert_admin_login_redirect(self.client.get(reverse('admin:core_businessconfig_generate_qr', args=[config.pk])))
-        config.refresh_from_db()
-        self.assertEqual(config.qr_static_token_hash, old_hash)
+        self.assert_admin_login_redirect(self.client.post(reverse('admin:companies_workplace_changelist'), {
+            'action': 'generate_qr', '_selected_action': workplace.pk,
+        }))
+        workplace.refresh_from_db()
+        self.assertEqual(workplace.qr_token_hash, old_hash)
 
     def test_staff_login_is_rejected_with_clear_error(self):
         response = self.client.post(reverse('admin:login'), {

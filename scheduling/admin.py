@@ -8,6 +8,7 @@ class ShiftAdmin(admin.ModelAdmin):
     list_display = (
         'date',
         'company',
+        'workplace',
         'employee',
         'start_time',
         'end_time',
@@ -15,9 +16,9 @@ class ShiftAdmin(admin.ModelAdmin):
         'position',
         'is_active',
     )
-    list_filter = ('company', 'date', 'position', 'is_active')
+    list_filter = ('company', 'workplace', 'date', 'position', 'is_active')
     search_fields = ('employee__full_name', 'employee__user__username', 'notes')
-    autocomplete_fields = ('company', 'employee')
+    autocomplete_fields = ('company', 'employee', 'workplace')
     readonly_fields = ('created_by', 'modified_by', 'created_at', 'updated_at')
     date_hierarchy = 'date'
     fieldsets = (
@@ -25,6 +26,7 @@ class ShiftAdmin(admin.ModelAdmin):
             'fields': (
                 'employee',
                 'company',
+                'workplace',
                 'date',
                 'start_time',
                 'end_time',

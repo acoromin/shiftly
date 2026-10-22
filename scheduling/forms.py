@@ -1,6 +1,7 @@
 from django import forms
 
 from employees.selectors import active_employees_for_company
+from companies.models import Workplace
 
 from .models import Shift
 
@@ -10,6 +11,7 @@ class ShiftForm(forms.ModelForm):
         model = Shift
         fields = (
             'employee',
+            'workplace',
             'date',
             'start_time',
             'end_time',
@@ -27,6 +29,7 @@ class ShiftForm(forms.ModelForm):
     def __init__(self, *args, company=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['employee'].queryset = active_employees_for_company(company)
+        self.fields['workplace'].queryset = Workplace.objects.filter(company=company, is_active=True) if company else Workplace.objects.none()
         if company is not None:
             self.instance.company = company
         for field in self.fields.values():

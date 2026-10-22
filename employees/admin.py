@@ -16,7 +16,7 @@ class EmployeeProfileAdmin(admin.ModelAdmin):
     )
     list_filter = ('company', 'role', 'primary_position', 'contract_type', 'is_active')
     search_fields = ('full_name', 'email', 'phone', 'dni_nie', 'user__username')
-    autocomplete_fields = ('user', 'company')
+    autocomplete_fields = ('user', 'company', 'primary_workplace')
     readonly_fields = ('created_at', 'updated_at')
     fieldsets = (
         ('Usuario y rol', {
@@ -29,6 +29,7 @@ class EmployeeProfileAdmin(admin.ModelAdmin):
             'fields': (
                 'start_date',
                 'end_date',
+                'primary_workplace',
                 'primary_position',
                 'contract_type',
                 'weekly_contracted_hours',

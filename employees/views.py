@@ -43,7 +43,7 @@ def employee_list(request):
 @transaction.atomic
 def employee_create(request):
     current_profile = _require_admin(request)
-    form = EmployeeForm(request.POST or None)
+    form = EmployeeForm(request.POST or None, company=current_profile.company)
     if request.method == 'POST' and form.is_valid():
         user = User.objects.create_user(
             username=form.cleaned_data['username'],
@@ -53,7 +53,7 @@ def employee_create(request):
         employee = form.save(commit=False)
         employee.user = user
         employee.company = current_profile.company
-        if (
+        if not employee.primary_workplace_id and (
             current_profile.primary_workplace_id
             and current_profile.primary_workplace.company_id == current_profile.company_id
         ):
@@ -69,7 +69,7 @@ def employee_create(request):
 def employee_edit(request, pk):
     current_profile = _require_admin(request)
     employee = get_object_or_404(_employee_queryset_for_admin(current_profile).select_related('user'), pk=pk)
-    form = EmployeeForm(request.POST or None, instance=employee, user_instance=employee.user)
+    form = EmployeeForm(request.POST or None, instance=employee, user_instance=employee.user, company=current_profile.company)
     if request.method == 'POST' and form.is_valid():
         user = employee.user
         user.username = form.cleaned_data['username']

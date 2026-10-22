@@ -8,11 +8,23 @@ from django.urls import reverse
 
 from companies.models import Company, Workplace
 
+from .forms import EmployeeForm
 from .models import EmployeeProfile
 from .selectors import active_employees_for_company, employees_for_company
 
 
 class EmployeeProfileTests(TestCase):
+    def test_employee_form_limits_primary_workplace_to_company(self):
+        company = Company.objects.create(name='Empresa A')
+        own = Workplace.objects.create(company=company, name='Centro A')
+        foreign_company = Company.objects.create(name='Empresa B')
+        foreign = Workplace.objects.create(company=foreign_company, name='Centro B')
+        form = EmployeeForm(company=company)
+
+        self.assertIn(own, form.fields['primary_workplace'].queryset)
+        self.assertNotIn(foreign, form.fields['primary_workplace'].queryset)
+        self.assertFalse(EmployeeForm().fields['primary_workplace'].queryset.exists())
+
     def employee_form_payload(self, *, username='ana.actualizada', full_name='Ana Actualizada'):
         return {
             'username': username,
@@ -162,13 +174,14 @@ class EmployeeProfileTests(TestCase):
         self.assertTrue(profile.is_worker)
         self.assertEqual(profile.get_role_display(), 'Trabajador')
 
-    def test_django_admin_exposes_company_without_primary_workplace(self):
+    def test_django_admin_exposes_company_and_primary_workplace(self):
         model_admin = admin.site._registry[EmployeeProfile]
         fields = [field for _name, options in model_admin.fieldsets for field in options['fields']]
 
         self.assertIn('company', fields)
         self.assertIn('company', model_admin.autocomplete_fields)
-        self.assertNotIn('primary_workplace', fields)
+        self.assertIn('primary_workplace', fields)
+        self.assertIn('primary_workplace', model_admin.autocomplete_fields)
 
     def test_admin_creates_user_and_employee_in_one_form(self):
         company = Company.objects.create(name='Empresa A')

@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.contrib import messages
+from django.urls import reverse
 
 from .models import Company, JobPosition, Workplace
 
@@ -32,6 +34,7 @@ class WorkplaceAdmin(admin.ModelAdmin):
     search_fields = ('name', 'company__name', 'address', 'city', 'postal_code', 'public_wifi_ip')
     autocomplete_fields = ('company',)
     readonly_fields = ('created_at', 'updated_at', 'qr_configured')
+    actions = ('generate_qr',)
     fieldsets = (
         ('Centro de trabajo', {
             'fields': ('company', 'name', 'is_active'),
@@ -53,6 +56,15 @@ class WorkplaceAdmin(admin.ModelAdmin):
     def qr_configured(self, obj):
         return 'Si' if obj and obj.qr_token_hash else 'No'
     qr_configured.short_description = 'QR configurado'
+
+    @admin.action(description='Generar QR para los centros seleccionados')
+    def generate_qr(self, request, queryset):
+        for workplace in queryset:
+            token = Workplace.generate_qr_token()
+            workplace.set_qr_token(token)
+            workplace.save(update_fields=['qr_token_hash'])
+            url = request.build_absolute_uri(reverse('timeclock:scan'))
+            messages.warning(request, f'{workplace}: guarda esta URL para el QR: {url}?token={token}')
 
 
 @admin.register(JobPosition)
