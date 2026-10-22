@@ -4,17 +4,15 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect, render
 
 from audit.models import AuditLog
-from employees.models import EmployeeProfile
+from employees.permissions import require_company_admin
 
-from .forms import BusinessConfigForm
+from .forms import BusinessConfigForm, CompanySettingsForm
 from .models import BusinessConfig
+from .permissions import is_technical_admin
 
 
-def _require_admin(request):
-    profile = getattr(request.user, 'employee_profile', None)
-    if not request.user.is_superuser and (
-        not profile or profile.role != EmployeeProfile.Role.ADMIN
-    ):
+def _require_technical_admin(request):
+    if not is_technical_admin(request.user):
         raise PermissionDenied
 
 
@@ -35,7 +33,7 @@ def _maintenance_payload(config):
 
 @login_required
 def settings(request):
-    _require_admin(request)
+    _require_technical_admin(request)
     config = BusinessConfig.get_solo()
     old_payload = _maintenance_payload(config)
 
@@ -82,13 +80,7 @@ def settings(request):
         )
 
         if config.maintenance_scheduled_start:
-            if config.maintenance_scheduled_start.weekday() == 0:
-                messages.success(request, 'Mantenimiento programado para el lunes.')
-            else:
-                messages.warning(
-                    request,
-                    'Mantenimiento programado fuera del lunes. Se permite para emergencias.',
-                )
+            messages.success(request, 'Mantenimiento global programado.')
         elif config.maintenance_enabled:
             messages.warning(request, 'Modo mantenimiento activado inmediatamente.')
         else:
@@ -105,4 +97,14 @@ def settings(request):
         },
     )
 
-# Create your views here.
+
+@login_required
+def company_settings(request):
+    profile = require_company_admin(request.user)
+    # The company is taken only from the authenticated profile, never from a submitted ID.
+    form = CompanySettingsForm(request.POST or None, instance=profile.company)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Configuración de tu empresa guardada.')
+        return redirect('core:company-settings')
+    return render(request, 'core/company_settings.html', {'form': form})

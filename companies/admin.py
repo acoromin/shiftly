@@ -19,7 +19,7 @@ class CompanyAdmin(admin.ModelAdmin):
             'fields': ('contact_email', 'phone', 'tax_id'),
         }),
         ('Configuracion', {
-            'fields': ('general_config',),
+            'fields': ('clock_tolerance_minutes', 'general_config'),
         }),
         ('Auditoria tecnica', {
             'fields': ('created_at', 'updated_at'),

@@ -1,6 +1,8 @@
 from django import forms
 from django.utils import timezone
 
+from companies.models import Company
+
 from .models import BusinessConfig
 
 
@@ -8,8 +10,6 @@ class BusinessConfigForm(forms.ModelForm):
     class Meta:
         model = BusinessConfig
         fields = (
-            'name',
-            'clock_tolerance_minutes',
             'maintenance_enabled',
             'maintenance_scheduled_start',
             'maintenance_scheduled_end',
@@ -41,3 +41,17 @@ class BusinessConfigForm(forms.ModelForm):
         if start and end and end <= start:
             self.add_error('maintenance_scheduled_end', 'Debe ser posterior al inicio.')
         return cleaned_data
+
+
+class CompanySettingsForm(forms.ModelForm):
+    class Meta:
+        model = Company
+        fields = ('name', 'clock_tolerance_minutes')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['clock_tolerance_minutes'].help_text = (
+            'Minutos de margen tras el inicio del turno antes de detectar una entrada ausente.'
+        )
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-control'

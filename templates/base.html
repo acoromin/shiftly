@@ -22,7 +22,7 @@
                 <div class="collapse navbar-collapse" id="main-navigation">
                     <div class="navbar-nav ms-xl-4 me-auto">
                         {% with namespace=request.resolver_match.namespace url_name=request.resolver_match.url_name %}
-                            {% if request.user.employee_profile.role == "administrador" %}
+                            {% if can_manage_company %}
                                 <a class="nav-link {% if namespace == 'dashboard' %}active{% endif %}" href="{% url 'dashboard:index' %}">Panel principal</a>
                                 <a class="nav-link {% if namespace == 'employees' %}active{% endif %}" href="{% url 'employees:list' %}">Empleados</a>
                                 <a class="nav-link {% if namespace == 'scheduling' %}active{% endif %}" href="{% url 'scheduling:week' %}">Turnos</a>
@@ -42,8 +42,11 @@
                     </div>
                     <div class="navbar-account">
                         <span>{{ request.user.employee_profile.full_name|default:request.user.get_username }}</span>
-                        {% if request.user.employee_profile.role == "administrador" %}
-                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:settings' %}">Configuración</a>
+                        {% if can_manage_company %}
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:company-settings' %}">Configuración de empresa</a>
+                        {% endif %}
+                        {% if can_manage_platform %}
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'core:settings' %}">Mantenimiento global</a>
                         {% endif %}
                         <form action="{% url 'logout' %}" method="post">
                             {% csrf_token %}
@@ -56,14 +59,16 @@
     </nav>
 
     <main class="container-fluid app-shell py-4">
-        {% if maintenance_active and request.user.employee_profile.role == "administrador" %}
+        {% if maintenance_active %}
+        {% if can_manage_company or can_manage_platform %}
             <div class="maintenance-admin-banner">
                 <div>
                     <strong>Modo mantenimiento activo</strong>
                     <span>Los trabajadores están bloqueados. El acceso de administrador continúa disponible.</span>
                 </div>
-                <a class="btn btn-sm btn-light" href="{% url 'core:settings' %}">Gestionar</a>
+                {% if can_manage_platform %}<a class="btn btn-sm btn-light" href="{% url 'core:settings' %}">Gestionar</a>{% endif %}
             </div>
+        {% endif %}
         {% endif %}
         {% if messages %}
             <div class="message-stack">

@@ -16,13 +16,9 @@ class TimeClockCompanyMigrationTests(TransactionTestCase):
         executor = MigrationExecutor(connection)
         self.latest_targets = executor.loader.graph.leaf_nodes()
         executor.migrate([self.migrate_from])
-        targets = [
-            self.migrate_from,
-            ('employees', '0006_alter_employeeprofile_company'),
-            ('scheduling', '0007_alter_shift_company'),
-            ('incidents', '0007_alter_incident_company'),
-        ]
-        self.apps = executor.loader.project_state(targets).apps
+        # Other apps keep their applied schemas while timeclock is rolled back.
+        targets = [target for target in self.latest_targets if target[0] != 'timeclock']
+        self.apps = executor.loader.project_state(targets + [self.migrate_from]).apps
         self.Entry = self.apps.get_model('timeclock', 'TimeClockEntry')
         self.addCleanup(self.restore_schema)
         Company = self.apps.get_model('companies', 'Company')

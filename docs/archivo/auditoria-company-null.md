@@ -1,5 +1,7 @@
 # Auditoria company/workplace NULL
 
+Documento histórico archivado. Describe exclusivamente la base auditada en la fecha indicada; sus referencias a datos «actuales» corresponden a esa fecha. No acredita el estado de la base local de hoy ni establece tareas pendientes. La única hoja de ruta vigente es [plan-desarrollo.md](../plan-desarrollo.md).
+
 Fecha: 2026-06-27
 
 Fase: `fase-auditoria-company-null`
@@ -121,10 +123,4 @@ Resultado: 0 inconsistencias detectadas.
 - 0 registros por datos actuales en modelos con `workplace` o `primary_workplace` auditados.
 - La decision funcional de si todos los modelos deben exigir centro sigue pendiente.
 
-## Recomendacion
-
-- Siguiente fase recomendada: `fase-cierre-admin-sin-company`.
-- Motivo: los datos actuales no tienen `company=NULL`, pero el codigo aun conserva modo global temporal para administradores sin empresa.
-- Despues de cerrar ese modo, evaluar `fase-hardening-company-not-null`.
-- No se recomienda `fase-backfill-company-null` con los datos actuales porque no hay registros recuperables.
-- No se recomienda `fase-decision-legacy-company-null` con los datos actuales porque no hay registros legacy pendientes.
+Las recomendaciones de ejecución de esta auditoría se han retirado por estar superadas. Su versión original se conserva en el historial de Git.

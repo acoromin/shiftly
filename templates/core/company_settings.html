@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Configuración de empresa | Xarlot{% endblock %}
+{% block content %}
+<header class="page-header">
+    <div>
+        <p class="eyebrow">Administración de empresa</p>
+        <h1>Configuración de tu empresa</h1>
+        <p>Estos ajustes se aplican a tu empresa y sus trabajadores.</p>
+    </div>
+</header>
+<form class="surface form-surface" method="post" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="form-grid">
+        {% include "shared/form_field.html" with field=form.name %}
+        {% include "shared/form_field.html" with field=form.clock_tolerance_minutes %}
+    </div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Guardar configuración</button></div>
+</form>
+{% endblock %}

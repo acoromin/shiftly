@@ -8,11 +8,14 @@ def profile_for(user):
 
 
 def is_admin_profile(profile):
-    return bool(profile and profile.role == EmployeeProfile.Role.ADMIN)
+    return bool(
+        profile and profile.is_active and profile.user.is_active
+        and profile.role == EmployeeProfile.Role.ADMIN
+    )
 
 
 def is_company_admin_profile(profile):
-    return is_admin_profile(profile) and bool(profile.company_id)
+    return is_admin_profile(profile) and bool(profile.company_id) and profile.company.is_active
 
 
 def is_admin_without_company(profile):

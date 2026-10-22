@@ -1,8 +1,10 @@
 # Estado de sesion
 
-Fecha ultima actualizacion: 2026-10-16
+Fecha ultima actualizacion: 2026-10-22
 
 Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `mira estado-sesion`, leer este archivo primero, comprobar el estado real del repo y actuar segun `Siguiente Accion Operativa`.
+
+El orden vigente de desarrollo y sus criterios de cierre estan en [plan-desarrollo.md](plan-desarrollo.md). Este archivo conserva el estado ejecutado y el historial. Las instrucciones antiguas de ejecucion se han retirado; el unico orden vigente es D1–D9.
 
 ## Reglas Para Retomar
 
@@ -19,15 +21,17 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 
 ## Siguiente Accion Operativa
 
-- Fase cerrada: `fase-workplace-operativo-y-qr-ip-por-centro` (fase 8).
-- Siguiente fase tecnica: `fase-auditlog-y-documentacion-tenant-aware` (fase 9).
-- Auditar `AuditLog` y sus creadores/lectores antes de anadir contexto de empresa/centro; definir la relacion con eventos globales de mantenimiento.
-- La base original sigue sin localizarse: si aparece, hacer copia y auditoria propias antes de aplicar migraciones.
+- Etapa cerrada localmente: **D1 — Permisos y configuracion global**; codigo, pruebas y matriz documentada.
+- Siguiente etapa: **D2 — Fichaje, red y credenciales de centro**, definida en [plan-desarrollo.md](plan-desarrollo.md).
+- Primera tarea: auditar la obtencion de IP en fichaje y reproducir con un test la cabecera `X-Forwarded-For` falsificada. Definir proxies confiables y contrato de despliegue antes de modificar la autorizacion por IP.
+- Cierre de D2: pruebas de cabeceras/QR/centros, comprobacion a traves del proxy de staging y guia operativa; no dar por validado un entorno que no exista.
+- La antigua fase 9 de AuditLog queda incorporada a D6. Seguir el orden D1–D9 sin adelantar fases.
 - La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias. No se han localizado ni migrado sus datos.
 
 ## Estado Actual Del Proyecto
 
-- Fase cerrada: `fase-workplace-operativo-y-qr-ip-por-centro`; validaciones del cierre detalladas al final. Baseline anterior: `2241590` (admin tecnico).
+- Etapa cerrada localmente: D1. Baseline de entrada: `9985608` (fase 8). Matriz vigente en [permisos-configuracion.md](permisos-configuracion.md).
+- Ultimo cierre funcional publicado: `9985608`. D1 implementada y verificada localmente; D2–D9 pendientes. No se ha desplegado D1 ni realizado push en este cierre.
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
 - Cada fase cerrada dispone de su commit local con codigo, tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
@@ -42,11 +46,15 @@ Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `
 - Admin operativo sin `company` esta cerrado en vistas cliente.
 - Staff/superuser sin perfil no tiene panel operativo global de cliente.
 - Django Admin global queda reservado a superusuarios tecnicos activos y staff; los usuarios staff sin superuser no acceden, aunque tengan permisos de modelos.
-- `BusinessConfig` sigue siendo global para mantenimiento. Sus campos QR/IP antiguos permanecen en el esquema, pero no autorizan fichajes. El fichaje usa QR/IP de `Workplace`.
-- `docs/multiempresa-diagnostico.md` es historico/obsoleto y no debe usarse como estado actual.
-- `docs/hardening-company-not-null-plan.md` es plan historico de la primera etapa; la fuente viva es este archivo.
+- `BusinessConfig` es global para mantenimiento y solo lo edita un tecnico activo, staff y superusuario. Nombre y tolerancia operativos pertenecen a `Company`; QR/IP a `Workplace`. Los campos antiguos permanecen para compatibilidad y no autorizan fichajes. `companies.0004` aplicada localmente.
+- Configuracion de empresa en `/configuracion/empresa/`, limitada a la empresa del perfil. Perfiles inactivos o empresas inactivas no acceden a las rutas cliente; un tecnico conserva las herramientas globales de recuperacion.
+- Riesgos abiertos: confianza incondicional en `X-Forwarded-For`; consultas recalculan/persisten resumenes y reinician horas extra aprobadas; concurrencia de fichajes sin acreditar. El acceso de administradores de empresa al mantenimiento global queda corregido en D1. El plan ordena los riesgos restantes.
+- Los documentos de planificacion obsoletos se han eliminado; sus versiones originales se conservan en Git.
+- La [auditoria historica de datos](archivo/auditoria-company-null.md) se conserva en `docs/archivo/` como evidencia, sin instrucciones para retomar el trabajo.
 
 ## Ultima Auditoria De Datos
+
+D1, 2026-10-22: una empresa activa (Xarlot), cero perfiles, cero staff/superusuarios y ninguna fila BusinessConfig. Copia verificada con `PRAGMA integrity_check`: `backups/shiftly-pre-d1-20261022-222641.sqlite3`. Aplicada `companies.0004`: misma empresa/nombre/estado, tolerancia 5; sigue sin configuracion global. No se crean cuentas ni se reasignan empresas.
 
 Auditoria de acceso local 2026-10-16 antes de fase 7: staff 0, staff sin superuser 0, superusers 0. La politica anterior permitia has_permission a cualquier usuario activo staff; la nueva exige tambien superuser. No se han creado, borrado ni modificado cuentas locales.
 
@@ -86,6 +94,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+D1, 2026-10-22: `core dashboard companies`, 52 OK; migraciones de timeclock y companies, 4 OK; regresion completa final, **221 pruebas OK** sobre SQLite (89,719 s). `check`, `makemigrations --check --dry-run`, enlaces Markdown y `git diff --check` OK. `companies.0004` aplicada y verificada tras copia local.
 
 Fase `fase-workplace-operativo-y-qr-ip-por-centro`, 2026-10-22: tests relacionados 124 OK antes de cerrar los casos de QR/turno adicionales; suite completa 203 OK; `check`, `makemigrations --check --dry-run` y `git diff --check` OK; `companies.0003` aplicada a la base local.
 
@@ -220,13 +230,6 @@ Validaciones historicas relevantes:
 - El formulario manual de fichajes no consulta empleados globalmente si falta empresa.
 - Django Admin expone `company` en `EmployeeProfile`, `Shift`, `LeaveRequest` e `Incident` para no romper creacion tecnica.
 
-## Invariantes Pendientes
-
-- `workplace` todavia no es una invariante fuerte.
-- QR/IP por fichaje siguen en `BusinessConfig` global y deben moverse a `Workplace` en una fase posterior.
-- `AuditLog` no guarda `company` ni `workplace`.
-- `reports` y `dashboard` conservan side effects en GET.
-
 ## Fases Cerradas
 
 - `fase-seed-empresa-inicial`: modelos base de empresa/centro/puestos y seed inicial.
@@ -259,183 +262,9 @@ Validaciones historicas relevantes:
 - `fase-integridad-relaciones-operativas`: relaciones y cambios de empresa protegidos, acciones pendientes verificadas y 185 tests OK.
 - `fase-admin-tenant-scope`: opcion de reserva a superusuario tecnico, acceso/login centralizado y 192 tests OK.
 
-## Hoja De Ruta Priorizada
+## Registro Historico De Sesiones
 
-### 0. `fase-cierre-baseline-post-incident`
-
-- Objetivo: cerrar correctamente la fase ya implementada de `Incident.company`.
-- Riesgo que elimina: empezar nuevas migraciones sobre una base local o branch no estabilizada.
-- Componentes afectados: git status, migraciones `incidents`, documentacion de sesion.
-- Dependencias: ninguna; es precondicion operativa.
-- Cambios previstos: ninguno funcional; aplicar/verificar migracion en entornos objetivo y preparar commit si procede.
-- Riesgos de migracion/datos: si `incidents.0007` no esta aplicada, produccion aun permite null a nivel DB.
-- Tests: no nuevos; repetir smoke de `incidents` si se aplica migracion.
-- Validaciones: `./.venv/bin/python manage.py showmigrations incidents`, `./.venv/bin/python manage.py migrate --plan`, `./.venv/bin/python manage.py test incidents`, `./.venv/bin/python manage.py check`.
-- Done: worktree/base claramente estabilizados y `Incident.company` obligatorio en codigo y DB objetivo.
-
-### 1. `fase-hardening-timeclockentry-company-not-null`
-
-- Objetivo: hacer obligatorio `TimeClockEntry.company`.
-- Riesgo que elimina: fichajes sin tenant, invisibles para admins y peligrosos para payroll/incidencias.
-- Componentes afectados: `timeclock/models.py`, `timeclock/services.py`, `timeclock/forms.py`, `timeclock/admin.py`, tests de `timeclock`, `payroll`, `dashboard`, `incidents` y `reports` si procede.
-- Dependencias: `EmployeeProfile.company`, `Shift.company` e `Incident.company` obligatorios.
-- Cambios previstos: cerrar rutas con `company=None`, exponer `company` en admin, actualizar tests legacy y crear migracion unica.
-- Riesgos de migracion/datos: `TimeClockEntry.company=NULL` o desalineado con empleado/turno bloquearia la migracion.
-- Tests: reemplazar tests que aceptan fichajes sin empresa; anadir asserts en QR invalido, IP bloqueada y fichaje manual; probar `related_shift` de otro empleado.
-- Validaciones: auditoria ORM previa, suite relacionada, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: `TimeClockEntry.company` no nullable y ningun path conocido puede crear fichajes sin empresa.
-
-### 2. `fase-cierre-company-none-en-apis-internas`
-
-- Objetivo: eliminar fallbacks globales reutilizables.
-- Riesgo que elimina: futuros desarrolladores llamando forms/services con `company=None` y creando fugas.
-- Componentes afectados: `scheduling/forms.py`, `timeclock/forms.py`, `payroll/services.py` y tests asociados.
-- Dependencias: fase 1 para fichajes.
-- Cambios previstos: `company=None` debe fallar cerrado o requerir una API global interna explicita.
-- Riesgos de migracion/datos: ninguno directo; no requiere migracion.
-- Tests: forms con `company=None` devuelven queryset vacio o error; payroll sin company falla explicitamente.
-- Validaciones: tests `scheduling timeclock payroll reports`, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: no queda ningun servicio/form operativo que haga consulta global por omision.
-
-### 3. `fase-hardening-monthlysummary-company-not-null`
-
-- Objetivo: hacer obligatorio `MonthlyHoursSummary.company`.
-- Riesgo que elimina: resumenes mensuales ambiguos o globales.
-- Componentes afectados: `payroll/models.py`, `payroll/services.py`, `payroll/admin.py`, `payroll/tests.py`, `reports/tests.py`.
-- Dependencias: fases 1 y 2.
-- Cambios previstos: `company` obligatorio y `calculate_employee_summary()` siempre calculando en contexto de empresa.
-- Riesgos de migracion/datos: summaries sin empresa o con empresa distinta del empleado.
-- Tests: `company` requerido, coherencia employee/company y calculo worker/admin por empresa.
-- Validaciones: auditoria summaries, tests payroll/reports/timeclock, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: no existen summaries sin empresa y el calculo no mezcla tenants.
-
-### 4. `fase-hardening-payrolldraft-company-not-null`
-
-- Objetivo: hacer obligatorio `PayrollDraft.company`.
-- Riesgo que elimina: borradores de pre-nomina globales multiempresa.
-- Componentes afectados: `payroll/models.py`, `payroll/services.py`, `payroll/admin.py`, `reports/views.py`.
-- Dependencias: fases 2 y 3.
-- Cambios previstos: `generate_payroll_draft()` exige company, admin expone/filtra company y se crea migracion unica.
-- Riesgos de migracion/datos: drafts vacios o con lineas de varias empresas.
-- Tests: generar draft sin company debe fallar; CSV sigue pasando company del admin.
-- Validaciones: auditoria drafts null/mixtos, tests payroll/reports, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: ningun draft puede existir sin empresa.
-
-### 5. `fase-hardening-payrolldraftline-company-not-null`
-
-- Objetivo: hacer obligatoria y coherente la empresa de cada linea.
-- Riesgo que elimina: lineas de pre-nomina cruzadas entre draft, empleado y empresa.
-- Componentes afectados: `payroll/models.py`, `payroll/services.py`, admin inline y tests.
-- Dependencias: fases 3 y 4.
-- Cambios previstos: `PayrollDraftLine.company` obligatorio y validacion `line.company == draft.company == employee.company`.
-- Riesgos de migracion/datos: lineas con empresa nula o distinta al draft/empleado.
-- Tests: rechazo de linea cruzada y una linea por empleado/draft si se anade constraint.
-- Validaciones: auditoria line null/mismatch, tests payroll/reports, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: no hay lineas sin empresa ni lineas fuera de la empresa del draft.
-
-### 6. `fase-integridad-relaciones-operativas`
-
-- Objetivo: reforzar invariantes cruzadas de dominio.
-- Riesgo que elimina: registros coherentes por empresa pero enlazados a empleado/turno/fichaje equivocado.
-- Componentes afectados: `timeclock/models.py`, `incidents/models.py`, `leaves/models.py`, `employees/models.py`.
-- Dependencias: fases `company NOT NULL` de modelos operativos.
-- Cambios previstos: validar `related_shift.employee`, `incident.shift.employee`, `incident.timeclock_entry.employee` y estados de revision/resolucion.
-- Riesgos de migracion/datos: registros historicos con enlaces cruzados.
-- Tests: casos negativos por relacion cruzada y estados inconsistentes.
-- Validaciones: auditorias cross-table previas, tests por app, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: las entidades operativas no permiten asociaciones imposibles via modelo/form/admin.
-
-### 7. `fase-admin-tenant-scope`
-
-- Objetivo: aislar Django Admin por empresa o reservarlo a superuser tecnico.
-- Riesgo que elimina: fugas/modificaciones cross-tenant desde admin.
-- Componentes afectados: todos los `admin.py`, posiblemente un mixin compartido.
-- Dependencias: campos `company` obligatorios en operativos y payroll.
-- Cambios previstos: `get_queryset`, `formfield_for_foreignkey`, permisos y `company` readonly/asignada para admins de empresa.
-- Riesgos de migracion/datos: staff existentes con permisos demasiado amplios.
-- Tests: admin con empresa no ve objetos de otra; superuser conserva acceso global.
-- Validaciones: tests admin por modelo, permisos manuales basicos, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: admin tecnico no puede romper aislamiento tenant accidentalmente.
-
-### 8. `fase-workplace-operativo-y-qr-ip-por-centro`
-
-- Objetivo: convertir `Workplace` en contexto real de planificacion/fichaje.
-- Riesgo que elimina: QR/IP globales y centros inferidos de forma debil.
-- Componentes afectados: `companies`, `employees`, `scheduling`, `timeclock`, `core`.
-- Dependencias: empresa obligatoria y admin tenant-scoped.
-- Cambios previstos: exponer centro en forms/admin, preservar centro al duplicar/copiar turnos y fichar contra QR/IP del centro.
-- Riesgos de migracion/datos: empleados/turnos/fichajes sin centro o con centro incorrecto.
-- Tests: QR/IP por centro, centro de turno preferente y centro obligatorio si aplica.
-- Validaciones: auditoria workplace, tests timeclock/scheduling/companies, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: el fichaje ya no depende de `BusinessConfig` global para QR/IP operativo.
-
-### 9. `fase-auditlog-y-documentacion-tenant-aware`
-
-- Objetivo: auditar y documentar el sistema multiempresa real.
-- Riesgo que elimina: trazabilidad global ambigua y documentacion que guia mal.
-- Componentes afectados: `audit/models.py`, creacion de logs, `docs/*.md`, `README.md`.
-- Dependencias: fases de company/workplace principales.
-- Cambios previstos: anadir `company` nullable a audit log para eventos tenant y actualizar docs obsoletos.
-- Riesgos de migracion/datos: logs antiguos sin empresa deben seguir validos.
-- Tests: logs de fichaje/mantenimiento/reportes incluyen contexto cuando aplica.
-- Validaciones: tests audit/core/timeclock, revision documental, suite global, `check`, `makemigrations --check --dry-run`, `git diff --check`.
-- Done: la documentacion refleja el estado actual y los logs permiten investigacion por tenant.
-
-## Plan Detallado Conservado De La Fase De Fichajes (Cerrada)
-
-Fase: `fase-hardening-timeclockentry-company-not-null`
-
-1. Auditoria previa:
-- Consultar `TimeClockEntry.company=NULL`.
-- Consultar `TimeClockEntry.employee.company != TimeClockEntry.company`.
-- Consultar `TimeClockEntry.workplace.company != TimeClockEntry.company`.
-- Consultar `TimeClockEntry.related_shift.company != TimeClockEntry.company`.
-- Consultar `TimeClockEntry.related_shift.employee != TimeClockEntry.employee`.
-- Si cualquier conteo es mayor que 0, parar y abrir fase de saneamiento de datos.
-
-2. Proteccion de write paths:
-- Cambiar `TimeClockEntry.clean()` para exigir `company`.
-- Validar que `related_shift.employee == employee`.
-- Mantener `workplace` nullable por ahora.
-- Anadir `save()` con `full_clean()` en `TimeClockEntry`, salvo bloqueo tecnico demostrado.
-- Cambiar `ManualTimeClockEntryForm(company=None)` a fail-closed.
-- Exponer `company` en `TimeClockEntryAdmin`.
-
-3. Migracion:
-- Quitar `blank=True` y `null=True` de `TimeClockEntry.company`.
-- Crear una unica migracion `timeclock/migrations/0006_alter_timeclockentry_company.py`.
-- No tocar `TimeClockEntry.workplace`.
-
-4. Tests:
-- Reemplazar `test_entry_allows_empty_company_and_workplace_temporarily` por `test_entry_requires_company`.
-- Reconducir tests de backfill/selector que crean entradas sin empresa.
-- Anadir test de admin expone `company`.
-- Anadir asserts de `company` en fichajes `INVALID_QR` y `BLOCKED_IP`.
-- Anadir test negativo para `related_shift` de otro empleado.
-- Actualizar fixtures de payroll que todavia crean fichajes sin empresa.
-
-5. Validaciones:
-- `./.venv/bin/python manage.py test timeclock incidents dashboard payroll reports`.
-- `./.venv/bin/python manage.py test`.
-- `./.venv/bin/python manage.py check`.
-- `./.venv/bin/python manage.py makemigrations --check --dry-run`.
-- `git diff --check`.
-- Actualizar `docs/estado-sesion.md`.
-
-6. Criterio exacto de cierre:
-- `TimeClockEntry.company` obligatorio en modelo y migracion.
-- Todos los paths normales crean fichajes con empresa.
-- No quedan tests que traten `TimeClockEntry.company=NULL` como estado valido.
-- Auditoria previa sin bloqueos.
-- Suite completa en verde.
-
-## Deudas Pendientes Importantes
-
-- Decidir cuando endurecer `workplace` a no nullable por modelo.
-- Definir administracion de centros por administradores de empresa si se necesita autoservicio; hoy la configuracion QR/IP se hace en Django Admin tecnico o por comando.
-- Decidir si hace falta panel operativo global interno para staff/superuser y como evitar que cree datos con `company=NULL`.
-- Anadir contexto `company`/`workplace` a `AuditLog` cuando aplique.
-- Actualizar o archivar documentacion obsoleta.
+Los siguientes cierres reflejan lo que se hizo y se decidio en cada fecha. Las menciones historicas a siguientes fases no son instrucciones vigentes; para continuar, usar exclusivamente `Siguiente Accion Operativa` y [plan-desarrollo.md](plan-desarrollo.md).
 
 ## Sesion 2026-10-16 - Preparacion Inicial (Historico; Cierre A Continuacion)
 
@@ -547,3 +376,37 @@ Fase: `fase-hardening-timeclockentry-company-not-null`
 - No se ha impuesto `workplace NOT NULL` ni cambiado el esquema de sus tres relaciones. Copia previa local: `backups/shiftly-pre-workplace-20261022.sqlite3`; migracion `companies.0003` aplicada.
 - Pruebas especificas de aislamiento de centros, QR/IP por centro, turno activo, copia/duplicacion y migracion de credenciales incorporadas. Suite completa: 203 tests OK; `check`, `makemigrations --check --dry-run` y `git diff --check` OK.
 - Siguiente fase: `fase-auditlog-y-documentacion-tenant-aware`.
+
+## Revision 2026-10-22 - Plan De Producto Y Escalabilidad
+
+- Creado `docs/plan-desarrollo.md` por peticion del usuario, con el objetivo de preparar un producto fiable y escalable y validar su utilidad mediante un piloto.
+- Orden vigente: D1 permisos globales; D2 IP/proxy y QR; D3 consultas y calculos de horas; D4 PostgreSQL/entornos/CI; D5 concurrencia; D6 auditoria e historico; D7 recorrido de cliente; D8 operacion/capacidad; D9 piloto y decision de lanzamiento.
+- Cada etapa incluye dependencias y evidencia de cierre. Los objetivos de carga, latencia y recuperacion son propuestas pendientes de medicion; no se presentan como capacidad actual.
+- Actualizados README y las secciones operativas de esta bitacora. La hoja antigua y los cierres anteriores se conservan como historico.
+- Cambio exclusivamente documental; sin cambios de codigo, datos o migraciones. Revision de enlaces locales y `git diff --check` correctos. No se ha repetido la suite funcional por este cambio.
+- Siguiente tarea concreta: D1, reproducir y cerrar el permiso que permite a un administrador de empresa activar mantenimiento global.
+
+## Limpieza 2026-10-22 - Una Sola Hoja De Ruta
+
+- Eliminados los dos documentos obsoletos de planificacion y diagnostico multiempresa, a peticion del usuario.
+- Retiradas de esta bitacora la hoja de ruta antigua, el plan detallado de fichajes cerrado y las listas duplicadas de pendientes. Se conservan los cierres, resultados y auditorias historicas.
+- Archivada la auditoria antigua en `docs/archivo/`, identificada como evidencia de otra fecha y sin sus recomendaciones de siguientes fases.
+- `docs/plan-desarrollo.md` es el unico plan vigente. Esta bitacora registra avance y siguiente tarea: D1, permisos y configuracion global.
+- Cambio documental; enlaces y diff revisados.
+
+## Cierre D1 — Permisos y configuracion global (2026-10-22)
+
+- Reproducido el fallo original mediante una prueba: un administrador de empresa obtenia 302 y activaba mantenimiento global; se esperaba 403. Corregido antes del cierre.
+- `/configuracion/` y Django Admin comparten el requisito tecnico: usuario autenticado, activo, staff y superusuario. Los administradores de empresa no pueden consultar ni modificar el formulario global, tampoco enviando POST manuales.
+- Nueva pantalla `/configuracion/empresa/`: nombre y tolerancia exclusivamente de la empresa del perfil. Ignora identificadores ajenos y campos de plataforma enviados por el cliente. Navegacion y banner distinguen las capacidades.
+- La tolerancia del panel pasa a `Company.clock_tolerance_minutes`. Migracion `companies.0004` ensayada con valor global personalizado para varias empresas y con ausencia de configuracion global; aplicada localmente tras copia verificada. Se conservan los campos globales antiguos para compatibilidad historica.
+- Perfiles inactivos o sin empresa y empresas inactivas quedan bloqueados en rutas cliente. Se mantiene el cierre de sesion y el acceso tecnico a herramientas globales de recuperacion. Un tecnico sin perfil no obtiene permisos de administrador de empresa.
+- Middleware y contexto de mantenimiento consultan sin crear una fila `BusinessConfig` al abrir pantallas cliente o denegar un acceso.
+- Matriz de roles, inventario de rutas, propiedad de ajustes y limites documentados en `docs/permisos-configuracion.md`. Es una referencia tecnica; `docs/plan-desarrollo.md` sigue siendo el unico plan vigente.
+- La primera regresion completa detecto dos errores en fixtures de `timeclock.test_migrations`: usaban un estado historico de Company incompatible con el esquema que seguia aplicado. Se corrigio la preparacion para respetar las migraciones actuales de las otras apps, manteniendo el retroceso de timeclock y sus aserciones de integridad.
+- Pruebas focalizadas: `core dashboard companies`, 52 OK; tras el ajuste del fixture, `timeclock.test_migrations companies.test_migrations`, 4 OK.
+- Comprobaciones: `check` sin incidencias; `makemigrations --check --dry-run` sin cambios; enlaces locales Markdown correctos. Recorridos de configuracion verificados con peticiones HTTP de integracion y comprobacion del HTML, sin validacion visual en navegador.
+- Limites: validacion local sobre SQLite. No acredita produccion ni concurrencia PostgreSQL; no hay despliegue ni push de este cierre. Base original pendiente de localizar/auditar. D2–D9 conservan sus criterios de salida.
+- Siguiente sesion: leer el inicio de esta bitacora, comprobar Git y comenzar D2 por la obtencion de IP y la prueba de `X-Forwarded-For` falsificado. No se ha empezado D2 hoy.
+
+- Regresion completa final tras la correccion: **221 pruebas OK**, 89,719 s, SQLite; `git diff --check` OK. Commit local de cierre: `fase-permisos-plataforma-y-empresa` (incluye la consolidacion documental autorizada en esta sesion).

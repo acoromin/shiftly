@@ -5,7 +5,6 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import render
 from django.utils import timezone
 
-from core.models import BusinessConfig
 from employees.models import EmployeeProfile
 from employees.permissions import is_admin_without_company, is_company_admin_profile
 from employees.selectors import active_employees_for_company
@@ -64,7 +63,7 @@ def index(request):
             timestamp__gte=timezone.now() - timedelta(days=7),
         ).order_by('-timestamp')[:8]
         now = timezone.localtime()
-        tolerance = timedelta(minutes=BusinessConfig.get_solo().clock_tolerance_minutes)
+        tolerance = timedelta(minutes=company.clock_tolerance_minutes)
         approved_absence_ids = leave_requests.filter(
             status=LeaveRequest.Status.APPROVED,
             start_date__lte=today,

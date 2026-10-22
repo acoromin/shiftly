@@ -2,6 +2,8 @@ from django.contrib.admin import AdminSite
 from django.contrib.admin.forms import AdminAuthenticationForm
 from django.core.exceptions import ValidationError
 
+from .permissions import is_technical_admin
+
 
 class TechnicalAdminAuthenticationForm(AdminAuthenticationForm):
     def confirm_login_allowed(self, user):
@@ -16,4 +18,4 @@ class TechnicalAdminSite(AdminSite):
     login_form = TechnicalAdminAuthenticationForm
 
     def has_permission(self, request):
-        return super().has_permission(request) and request.user.is_superuser
+        return is_technical_admin(request.user)

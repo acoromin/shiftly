@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Configuración | Xarlot{% endblock %}
+{% block title %}Mantenimiento de la plataforma | Xarlot{% endblock %}
 
 {% block content %}
 <header class="page-header">
     <div>
-        <p class="eyebrow">Administración</p>
-        <h1>Configuración</h1>
-        <p>Datos del negocio, fichajes y ventana de mantenimiento.</p>
+        <p class="eyebrow">Administración técnica</p>
+        <h1>Mantenimiento de la plataforma</h1>
+        <p>Estos cambios afectan a todas las empresas.</p>
     </div>
 </header>
 
@@ -16,18 +16,10 @@
     {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
 
     <section class="form-section">
-        <h2>Negocio</h2>
-        <div class="form-grid">
-            {% include "shared/form_field.html" with field=form.name %}
-            {% include "shared/form_field.html" with field=form.clock_tolerance_minutes %}
-        </div>
-    </section>
-
-    <section class="form-section">
         <div class="maintenance-heading">
             <div>
                 <h2>Modo mantenimiento</h2>
-                <p>El lunes es el día recomendado porque el bar permanece cerrado. No se activa automáticamente.</p>
+                <p>Acuerda la ventana de mantenimiento con las empresas afectadas.</p>
             </div>
             <span class="status-badge status-{% if maintenance_active_now %}pending{% else %}approved{% endif %}">
                 {% if maintenance_active_now %}Activo ahora{% else %}Aplicación disponible{% endif %}
@@ -52,7 +44,7 @@
 
         <div class="maintenance-note">
             <strong>Durante el mantenimiento</strong>
-            <span>Los trabajadores no pueden fichar, crear solicitudes ni acceder a sus pantallas. Los administradores mantienen el acceso completo.</span>
+            <span>Los trabajadores no pueden acceder a sus pantallas. Los administradores de empresa mantienen acceso a su empresa; solo el técnico puede gestionar este mantenimiento.</span>
         </div>
     </section>
 

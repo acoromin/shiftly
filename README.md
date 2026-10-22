@@ -2,6 +2,10 @@
 
 Aplicación web para gestionar empleados, turnos, fichajes, solicitudes, incidencias y resúmenes mensuales del bar.
 
+## Desarrollo y estado
+
+El [plan de desarrollo vigente](docs/plan-desarrollo.md) define las etapas para preparar el producto multiempresa, su operación y un piloto real. La [bitácora de continuidad](docs/estado-sesion.md) indica qué está verificado y la siguiente tarea. La configuración incluida actualmente corresponde al entorno de desarrollo.
+
 ## Arranque local
 
 ```bash
@@ -17,6 +21,8 @@ La aplicación estará disponible en `http://127.0.0.1:8000/`.
 `/administracion/` está reservado a superusuarios técnicos activos con `is_staff=True`.
 El permiso `is_staff` y los permisos individuales de modelos no bastan para acceder.
 Los administradores de empresa gestionan empleados, turnos, fichajes e informes desde las pantallas normales, limitadas a su empresa.
+
+En **Configuración de empresa** (`/configuracion/empresa/`) pueden cambiar el nombre y la tolerancia para detectar entradas ausentes en el panel de su empresa. La migración `companies.0004` conserva la tolerancia global anterior en las empresas existentes; las nuevas parten de 5 minutos. Consulta la [matriz de permisos y configuración](docs/permisos-configuracion.md).
 
 Para crear una cuenta técnica en un entorno local nuevo:
 
@@ -38,11 +44,11 @@ Los campos QR/IP antiguos de `BusinessConfig` ya no autorizan fichajes. La migra
 
 ## Ventana de mantenimiento
 
-El bar cierra los lunes. Por ese motivo, el lunes es el día recomendado para actualizaciones, migraciones, comprobaciones y copias de seguridad.
+El mantenimiento afecta a todas las empresas. Acuerda la ventana con sus responsables; el día de cierre de un local no determina el de los demás.
 
-El mantenimiento **no se activa automáticamente los lunes**. Un administrador debe activarlo o programarlo desde:
+Solo un técnico activo, staff y superusuario puede activarlo o programarlo desde:
 
-`Configuración > Modo mantenimiento`
+`Mantenimiento global` (`/configuracion/`)
 
 También puede activarse cualquier otro día si existe una emergencia grave.
 
@@ -52,9 +58,11 @@ Durante el modo mantenimiento:
 - Los trabajadores no pueden fichar.
 - Los trabajadores no pueden crear solicitudes ni incidencias.
 - Los trabajadores no pueden consultar sus pantallas.
-- Los administradores mantienen el acceso completo.
+- Los administradores de empresa mantienen acceso a su empresa, pero no pueden gestionar el mantenimiento.
 
-## Proceso recomendado para los lunes
+Este modo no detiene todas las escrituras: los administradores siguen operando. Cuando una copia o migración requiera detenerlas, deben pararse los procesos de aplicación.
+
+## Proceso de mantenimiento técnico
 
 1. Hacer una copia de seguridad de la base de datos.
 2. Activar el modo mantenimiento desde Xarlot.

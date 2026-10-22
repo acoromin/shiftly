@@ -68,8 +68,9 @@ class MaintenanceModeTests(TestCase):
         self.assertEqual(friday.weekday(), 4)
         self.assertTrue(self.config.is_maintenance_active(friday))
 
-    def test_admin_activation_is_audited(self):
-        self.client.force_login(self.admin_user)
+    def test_technician_activation_is_audited(self):
+        technician = User.objects.create_superuser(username='technician')
+        self.client.force_login(technician)
 
         response = self.client.post(reverse('core:settings'), {
             'name': 'Xarlot',

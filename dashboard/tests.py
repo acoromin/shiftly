@@ -6,7 +6,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from companies.models import Company
-from core.models import BusinessConfig
 from employees.models import EmployeeProfile
 from incidents.models import Incident
 from leaves.models import LeaveRequest
@@ -91,10 +90,7 @@ class DashboardTests(TestCase):
         self.assertNotContains(response, 'Luis Perez')
 
     def test_admin_dashboard_missing_clock_incident_saves_company(self):
-        config = BusinessConfig.get_solo()
-        config.clock_tolerance_minutes = 0
-        config.save(update_fields=['clock_tolerance_minutes'])
-        company = Company.objects.create(name='Empresa A')
+        company = Company.objects.create(name='Empresa A', clock_tolerance_minutes=0)
         admin_user = User.objects.create_user(username='admin', password='secret')
         EmployeeProfile.objects.create(
             user=admin_user,

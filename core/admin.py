@@ -8,15 +8,13 @@ class BusinessConfigAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'timezone',
-        'clock_tolerance_minutes',
         'maintenance_enabled',
         'updated_at',
     )
-    readonly_fields = ('updated_at',)
+    readonly_fields = ('name', 'updated_at')
     fields = (
         'name',
         'timezone',
-        'clock_tolerance_minutes',
         'maintenance_enabled',
         'maintenance_scheduled_start',
         'maintenance_scheduled_end',

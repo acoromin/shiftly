@@ -1,6 +1,7 @@
 import secrets
 
 from django.contrib.auth.hashers import check_password, make_password
+from django.core.validators import MaxValueValidator
 from django.db import models
 
 
@@ -30,6 +31,9 @@ class Company(models.Model):
     phone = models.CharField('telefono', max_length=30, blank=True)
     tax_id = models.CharField('CIF/NIF', max_length=30, blank=True)
     is_active = models.BooleanField('activa', default=True)
+    clock_tolerance_minutes = models.PositiveSmallIntegerField(
+        'minutos de tolerancia', default=5, validators=[MaxValueValidator(32767)],
+    )
     general_config = models.JSONField('configuracion general', default=dict, blank=True)
     created_at = models.DateTimeField('fecha de alta', auto_now_add=True)
     updated_at = models.DateTimeField('actualizada el', auto_now=True)
