@@ -16,6 +16,8 @@ python manage.py runserver
 
 La aplicación estará disponible en `http://127.0.0.1:8000/`.
 
+Para probar los roles y las pantallas con datos ficticios, consulta la [demo local de Café Brisa](docs/demo-local.md). Las credenciales de esa demo se guardan solo en `backups/demo-access.txt`, fuera de Git.
+
 ## Acceso al administrador técnico
 
 `/administracion/` está reservado a superusuarios técnicos activos con `is_staff=True`.

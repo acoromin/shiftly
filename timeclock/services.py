@@ -244,7 +244,7 @@ def attempt_clock(request, employee, token, related_shift=None, public_id=None):
             ip_address=ip_address,
             payload={'expected_ip': workplace.public_wifi_ip, 'detected_ip': ip_address},
         )
-        return False, 'Debes estar conectado al WiFi del bar para fichar.', entry
+        return False, 'Debes estar conectado al WiFi del centro para fichar.', entry
 
     last_entry = last_valid_entry(employee)
     if last_entry and timezone.now() - last_entry.timestamp < timedelta(seconds=60):

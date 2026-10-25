@@ -8,7 +8,7 @@
         <div>
             <p class="eyebrow">Hoy · {{ today|date:"d/m/Y" }}</p>
             <h1>Panel principal</h1>
-            <p>Resumen operativo de Xarlot.</p>
+            <p>Resumen operativo de {{ profile.company.name }}.</p>
         </div>
         <div class="header-actions">
             <a class="btn btn-outline-primary" href="{% url 'employees:create' %}">Añadir trabajador</a>

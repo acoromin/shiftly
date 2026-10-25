@@ -23,6 +23,7 @@ El orden vigente de desarrollo y sus criterios de cierre estan en [plan-desarrol
 
 - Etapa cerrada localmente: **D1 — Permisos y configuracion global** (`f1541e4`).
 - Etapa activa: **D2 — Fichaje, red y credenciales de centro**. Politica de IP, QR nuevo, transicion de QR antiguos y limites de intentos implementados localmente; [guia operativa](seguridad-fichaje-d2.md).
+- Demo local solicitada por el usuario: [Café Brisa](demo-local.md), con jefa y dos trabajadores. La cuenta tecnica `acoromin` se conserva. Las credenciales reales estan en `backups/demo-access.txt` (ignorado por Git).
 - Falta para cerrar D2: ensayo del proxy y de QR impreso/login en staging, inspeccion de logs y confirmacion de aislamiento de acceso directo. No se ha localizado un staging ni hay datos de proxy confirmados. No declarar D2 cerrada sin esa evidencia.
 - Siguiente tarea: localizar o preparar staging/proxy, confirmar sus CIDR confiables y completar la validacion integrada descrita en `docs/seguridad-fichaje-d2.md`. Si el entorno no existe, D2 sigue abierta; no empezar D3 anticipadamente.
 - La antigua fase 9 de AuditLog queda incorporada a D6. Seguir el orden D1–D9.
@@ -53,6 +54,8 @@ El orden vigente de desarrollo y sus criterios de cierre estan en [plan-desarrol
 - La [auditoria historica de datos](archivo/auditoria-company-null.md) se conserva en `docs/archivo/` como evidencia, sin instrucciones para retomar el trabajo.
 
 ## Ultima Auditoria De Datos
+
+Demo local, 2026-10-25: antes de crear datos ficticios se verifico la copia `backups/shiftly-pre-demo-20261025-221432.sqlite3` (`PRAGMA integrity_check=ok`), con `acoromin` como unico usuario y cero perfiles. Tras preparar Café Brisa: Xarlot sembrada y Café Brisa (`business_type=cafe`), 4 cuentas incluidas `acoromin`, 3 perfiles demo, 14 turnos, 16 fichajes de ejemplo, 2 solicitudes y 1 incidencia. El QR demo usa IP `127.0.0.1`. La base original sigue sin localizarse; estos datos locales no son de clientes.
 
 D2, 2026-10-25: una empresa, un centro activo, cero centros con QR y cero fichajes en la base local. Copia SQLite verificada: `backups/shiftly-pre-d2-20261025-215449.sqlite3`. Aplicadas `companies.0005` y `core.0004`: el centro conserva estado/credencial, tiene un UUID publico unico; contador de intentos vacio. Sin acceso a la base original ni staging.
 
@@ -96,6 +99,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+Demo local Café Brisa, 2026-10-25: regresion completa **241 pruebas OK** sobre SQLite (132,336 s). `check`, `makemigrations --check --dry-run`, `git diff --check` y enlaces Markdown OK. Prueba de integracion del comando y roles correcta; inspeccion visual en Chrome 390 x 844 px y QR local realizada. No hay cambios de esquema.
 
 D2 (avance local), 2026-10-25: regresion completa final **240 pruebas OK** sobre SQLite (138,845 s); `check`, `makemigrations --check --dry-run`, `migrate --plan`, enlaces Markdown y `git diff --check` OK. `companies.0005` y `core.0004` aplicadas localmente tras copia verificada. D2 sigue abierta por la prueba integrada de staging.
 
@@ -423,3 +428,10 @@ Los siguientes cierres reflejan lo que se hizo y se decidio en cada fecha. Las m
 - Contadores en DB para login normal/Admin y fichaje, con comando de limpieza diaria. Son limites locales; medir su comportamiento con varios procesos y PostgreSQL en D4–D5.
 - La guia D2 documenta el contrato de proxy, la IP WiFi, el tratamiento de secretos, impresion/rotacion/revocacion, la transicion de QR antiguos y los limites de presencia. D2 sigue abierta mientras falte prueba de proxy/QR impreso/logs en staging.
 - Pruebas focalizadas: `timeclock.tests companies.tests`, 63 OK tras el cambio de QR; `companies.test_qr_migration`, 1 OK; `core.test_throttling timeclock.tests.ClockThrottlingTests`, 4 OK; recorrido login/POST/QR/migracion, 6 OK; generacion/revocacion QR y prioridad POST, 3 OK. `check`, `makemigrations --check --dry-run` y `migrate --plan` sin incidencias. La regeneracion muestra secretos una sola vez en una respuesta `no-store`, sin mensaje/cookie. La regresion completa final fue de **240 pruebas OK** en 138,845 s sobre SQLite; la verificacion con proxy real e impresion/logs de QR sigue pendiente.
+
+## Demo local y revision de experiencia (2026-10-25)
+
+- Comando `seed_local_demo` limitado a `DEBUG=True` y SQLite; no toca la cuenta tecnica existente, rechaza perfiles reales y se puede reejecutar sin duplicar datos. Credenciales en `backups/demo-access.txt`, modo `0600` e ignoradas por Git.
+- Acceso real en Chrome a 390 x 844 px: administrador `demo_admin` y trabajadora `demo_ana` iniciaron sesion y cargaron paneles, turnos, empleados y fichaje. Menú móvil abrió; no hubo desbordamiento horizontal de página. El QR local habilitó el botón y su fragmento desapareció de la barra. Capturas ignoradas por Git en `backups/demo-previews/`.
+- Hallazgos de UX para D7: tabla de empleados requiere desplazamiento horizontal; la vista semanal en domingo obliga a recorrer tarjetas antiguas/menos relevantes; métricas del panel móvil apilan acciones abajo. Detalles en [demo-local.md](demo-local.md).
+- D2 sigue abierta: la prueba local en Chrome no acredita proxy, QR físico ni logs de staging. Próxima acción operativa D2 permanece arriba. Regresion completa tras la demo: **241 pruebas OK** (132,336 s).

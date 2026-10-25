@@ -460,7 +460,7 @@ class TimeClockTests(TestCase):
         ok, message, entry = attempt_clock(self.request(ip='198.51.100.7'), self.employee, 'valid-token')
 
         self.assertFalse(ok)
-        self.assertEqual(message, 'Debes estar conectado al WiFi del bar para fichar.')
+        self.assertEqual(message, 'Debes estar conectado al WiFi del centro para fichar.')
         self.assertEqual(entry.status, TimeClockEntry.Status.BLOCKED_IP)
         self.assertEqual(entry.company, self.company)
 
