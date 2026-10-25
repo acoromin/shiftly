@@ -1,4 +1,5 @@
 import secrets
+import uuid
 
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.validators import MaxValueValidator
@@ -63,6 +64,7 @@ class Workplace(models.Model):
     city = models.CharField('ciudad', max_length=120, blank=True)
     postal_code = models.CharField('codigo postal', max_length=20, blank=True)
     public_wifi_ip = models.GenericIPAddressField('IP publica permitida para fichaje', blank=True, null=True)
+    qr_public_id = models.UUIDField('identificador publico del QR', default=uuid.uuid4, unique=True, editable=False)
     qr_token_hash = models.CharField('token protegido del QR', max_length=256, blank=True)
     is_active = models.BooleanField('activo', default=True)
     regular_schedule = models.JSONField('horario habitual', default=dict, blank=True)
@@ -90,6 +92,9 @@ class Workplace(models.Model):
         if not raw_token or not self.qr_token_hash:
             return False
         return check_password(raw_token, self.qr_token_hash)
+
+    def qr_url(self, scan_url, token):
+        return f'{scan_url}#workplace={self.qr_public_id}&token={token}'
 
     @staticmethod
     def generate_qr_token():

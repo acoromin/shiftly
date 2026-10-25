@@ -1,6 +1,6 @@
 # Estado de sesion
 
-Fecha ultima actualizacion: 2026-10-22
+Fecha ultima actualizacion: 2026-10-25
 
 Este archivo es la fuente operativa principal del proyecto. Si el usuario dice `mira estado-sesion`, leer este archivo primero, comprobar el estado real del repo y actuar segun `Siguiente Accion Operativa`.
 
@@ -21,17 +21,17 @@ El orden vigente de desarrollo y sus criterios de cierre estan en [plan-desarrol
 
 ## Siguiente Accion Operativa
 
-- Etapa cerrada localmente: **D1 — Permisos y configuracion global**; codigo, pruebas y matriz documentada.
-- Siguiente etapa: **D2 — Fichaje, red y credenciales de centro**, definida en [plan-desarrollo.md](plan-desarrollo.md).
-- Primera tarea: auditar la obtencion de IP en fichaje y reproducir con un test la cabecera `X-Forwarded-For` falsificada. Definir proxies confiables y contrato de despliegue antes de modificar la autorizacion por IP.
-- Cierre de D2: pruebas de cabeceras/QR/centros, comprobacion a traves del proxy de staging y guia operativa; no dar por validado un entorno que no exista.
-- La antigua fase 9 de AuditLog queda incorporada a D6. Seguir el orden D1–D9 sin adelantar fases.
+- Etapa cerrada localmente: **D1 — Permisos y configuracion global** (`f1541e4`).
+- Etapa activa: **D2 — Fichaje, red y credenciales de centro**. Politica de IP, QR nuevo, transicion de QR antiguos y limites de intentos implementados localmente; [guia operativa](seguridad-fichaje-d2.md).
+- Falta para cerrar D2: ensayo del proxy y de QR impreso/login en staging, inspeccion de logs y confirmacion de aislamiento de acceso directo. No se ha localizado un staging ni hay datos de proxy confirmados. No declarar D2 cerrada sin esa evidencia.
+- Siguiente tarea: localizar o preparar staging/proxy, confirmar sus CIDR confiables y completar la validacion integrada descrita en `docs/seguridad-fichaje-d2.md`. Si el entorno no existe, D2 sigue abierta; no empezar D3 anticipadamente.
+- La antigua fase 9 de AuditLog queda incorporada a D6. Seguir el orden D1–D9.
 - La base local es nueva; cualquier base original que se recupere requiere copia y auditoria propias. No se han localizado ni migrado sus datos.
 
 ## Estado Actual Del Proyecto
 
 - Etapa cerrada localmente: D1. Baseline de entrada: `9985608` (fase 8). Matriz vigente en [permisos-configuracion.md](permisos-configuracion.md).
-- Ultimo cierre funcional publicado: `9985608`. D1 implementada y verificada localmente; D2–D9 pendientes. No se ha desplegado D1 ni realizado push en este cierre.
+- D1 tiene el commit `f1541e4`. D2 tiene codigo y pruebas locales, con validacion de staging pendiente. Consultar `git status -sb` y `origin/main` al retomar para comprobar el estado de publicacion; ningun cambio de D2 se ha desplegado en staging o produccion.
 - Baseline real de esta copia: `ccfe280` (`initial commit`), con la fase de Incident ya incluida. Las referencias a commits de septiembre que aparecen mas abajo son historicas.
 - Cada fase cerrada dispone de su commit local con codigo, tests y este documento. Las bases externas/originales siguen pendientes de su propia auditoria y migracion.
 - `EmployeeProfile.company` es obligatorio.
@@ -48,11 +48,13 @@ El orden vigente de desarrollo y sus criterios de cierre estan en [plan-desarrol
 - Django Admin global queda reservado a superusuarios tecnicos activos y staff; los usuarios staff sin superuser no acceden, aunque tengan permisos de modelos.
 - `BusinessConfig` es global para mantenimiento y solo lo edita un tecnico activo, staff y superusuario. Nombre y tolerancia operativos pertenecen a `Company`; QR/IP a `Workplace`. Los campos antiguos permanecen para compatibilidad y no autorizan fichajes. `companies.0004` aplicada localmente.
 - Configuracion de empresa en `/configuracion/empresa/`, limitada a la empresa del perfil. Perfiles inactivos o empresas inactivas no acceden a las rutas cliente; un tecnico conserva las herramientas globales de recuperacion.
-- Riesgos abiertos: confianza incondicional en `X-Forwarded-For`; consultas recalculan/persisten resumenes y reinician horas extra aprobadas; concurrencia de fichajes sin acreditar. El acceso de administradores de empresa al mantenimiento global queda corregido en D1. El plan ordena los riesgos restantes.
+- Riesgos abiertos: politica D2 de IP/QR pendiente de validacion en staging; consultas recalculan/persisten resumenes y reinician horas extra aprobadas; concurrencia de fichajes sin acreditar. El acceso de administradores de empresa al mantenimiento global queda corregido en D1.
 - Los documentos de planificacion obsoletos se han eliminado; sus versiones originales se conservan en Git.
 - La [auditoria historica de datos](archivo/auditoria-company-null.md) se conserva en `docs/archivo/` como evidencia, sin instrucciones para retomar el trabajo.
 
 ## Ultima Auditoria De Datos
+
+D2, 2026-10-25: una empresa, un centro activo, cero centros con QR y cero fichajes en la base local. Copia SQLite verificada: `backups/shiftly-pre-d2-20261025-215449.sqlite3`. Aplicadas `companies.0005` y `core.0004`: el centro conserva estado/credencial, tiene un UUID publico unico; contador de intentos vacio. Sin acceso a la base original ni staging.
 
 D1, 2026-10-22: una empresa activa (Xarlot), cero perfiles, cero staff/superusuarios y ninguna fila BusinessConfig. Copia verificada con `PRAGMA integrity_check`: `backups/shiftly-pre-d1-20261022-222641.sqlite3`. Aplicada `companies.0004`: misma empresa/nombre/estado, tolerancia 5; sigue sin configuracion global. No se crean cuentas ni se reasignan empresas.
 
@@ -94,6 +96,8 @@ Fecha: 2026-09-07
 - Nota: en esa auditoria local, `incidents.0007_alter_incident_company` no constaba como aplicada en `django_migrations`.
 
 ## Ultimas Validaciones Ejecutadas
+
+D2 (avance local), 2026-10-25: regresion completa final **240 pruebas OK** sobre SQLite (138,845 s); `check`, `makemigrations --check --dry-run`, `migrate --plan`, enlaces Markdown y `git diff --check` OK. `companies.0005` y `core.0004` aplicadas localmente tras copia verificada. D2 sigue abierta por la prueba integrada de staging.
 
 D1, 2026-10-22: `core dashboard companies`, 52 OK; migraciones de timeclock y companies, 4 OK; regresion completa final, **221 pruebas OK** sobre SQLite (89,719 s). `check`, `makemigrations --check --dry-run`, enlaces Markdown y `git diff --check` OK. `companies.0004` aplicada y verificada tras copia local.
 
@@ -410,3 +414,12 @@ Los siguientes cierres reflejan lo que se hizo y se decidio en cada fecha. Las m
 - Siguiente sesion: leer el inicio de esta bitacora, comprobar Git y comenzar D2 por la obtencion de IP y la prueba de `X-Forwarded-For` falsificado. No se ha empezado D2 hoy.
 
 - Regresion completa final tras la correccion: **221 pruebas OK**, 89,719 s, SQLite; `git diff --check` OK. Commit local de cierre: `fase-permisos-plataforma-y-empresa` (incluye la consolidacion documental autorizada en esta sesion).
+
+## Avance D2 — 2026-10-25
+
+- Reproducido con una prueba el fallo de IP: una conexion directa desde `198.51.100.99` con `X-Forwarded-For: 203.0.113.10` obtenia fichaje valido. La politica nueva ignora esa cabecera salvo que el peer pertenezca a `TRUSTED_PROXY_CIDRS`.
+- Nueva seleccion por `Workplace.qr_public_id` UUID, con busqueda por empresa/centro activo antes de verificar un unico hash. Sin ID se conserva el recorrido anterior mientras `CLOCK_ALLOW_LEGACY_QR=1`; la retirada operativa esta descrita en `docs/seguridad-fichaje-d2.md`.
+- URLs nuevas con secreto en fragmento; captura en navegador, envio POST e inicio de sesion con `next` POST. Admin tecnico y comando emiten el nuevo formato. Accion Admin de revocacion inmediata y regeneracion existente para rotacion.
+- Contadores en DB para login normal/Admin y fichaje, con comando de limpieza diaria. Son limites locales; medir su comportamiento con varios procesos y PostgreSQL en D4–D5.
+- La guia D2 documenta el contrato de proxy, la IP WiFi, el tratamiento de secretos, impresion/rotacion/revocacion, la transicion de QR antiguos y los limites de presencia. D2 sigue abierta mientras falte prueba de proxy/QR impreso/logs en staging.
+- Pruebas focalizadas: `timeclock.tests companies.tests`, 63 OK tras el cambio de QR; `companies.test_qr_migration`, 1 OK; `core.test_throttling timeclock.tests.ClockThrottlingTests`, 4 OK; recorrido login/POST/QR/migracion, 6 OK; generacion/revocacion QR y prioridad POST, 3 OK. `check`, `makemigrations --check --dry-run` y `migrate --plan` sin incidencias. La regeneracion muestra secretos una sola vez en una respuesta `no-store`, sin mensaje/cookie. La regresion completa final fue de **240 pruebas OK** en 138,845 s sobre SQLite; la verificacion con proxy real e impresion/logs de QR sigue pendiente.

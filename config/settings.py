@@ -28,6 +28,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 
+# Only addresses of reverse proxies that sanitize X-Forwarded-For.
+# An empty list keeps REMOTE_ADDR as the sole source for clock-in decisions.
+TRUSTED_PROXY_CIDRS = tuple(
+    value.strip() for value in os.environ.get('TRUSTED_PROXY_CIDRS', '').split(',')
+    if value.strip()
+)
+CLOCK_ALLOW_LEGACY_QR = os.environ.get('CLOCK_ALLOW_LEGACY_QR', '1') == '1'
+
 
 # Application definition
 

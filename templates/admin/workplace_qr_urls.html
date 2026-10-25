@@ -1,0 +1,11 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>QR nuevos de centros de trabajo</h1>
+<p>Guarda cada URL ahora para preparar e imprimir su QR. Los secretos no volverán a mostrarse.</p>
+<ul>
+    {% for workplace, url in urls %}
+        <li><strong>{{ workplace }}</strong><br><code>{{ url }}</code></li>
+    {% endfor %}
+</ul>
+<p><a href="{{ changelist_url }}">Volver a centros de trabajo</a></p>
+{% endblock %}

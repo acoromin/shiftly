@@ -10,11 +10,12 @@
                 <h1 class="h4 mb-3">Iniciar sesión</h1>
                 {% if form.errors %}
                     <div class="alert alert-danger">
-                        Usuario o contraseña incorrectos.
+                        {% if form.non_field_errors %}{{ form.non_field_errors }}{% else %}Usuario o contraseña incorrectos.{% endif %}
                     </div>
                 {% endif %}
                 <form method="post" novalidate>
                     {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ next|default:'' }}">
                     <div class="mb-3">
                         <label class="form-label" for="{{ form.username.id_for_label }}">Usuario</label>
                         <input
@@ -43,4 +44,15 @@
         </div>
     </div>
 </div>
+<script>
+    const loginQrData = new URLSearchParams(window.location.hash.slice(1));
+    const loginQrToken = loginQrData.get('token');
+    const loginQrWorkplace = loginQrData.get('workplace');
+    if (loginQrToken && /^[A-Za-z0-9_-]{16,128}$/.test(loginQrToken)
+        && loginQrWorkplace && /^[0-9a-fA-F-]{36}$/.test(loginQrWorkplace)) {
+        document.querySelector('input[name="next"]').value =
+            '{% url "timeclock:scan" %}#workplace=' + loginQrWorkplace + '&token=' + loginQrToken;
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+</script>
 {% endblock %}

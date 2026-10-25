@@ -3,9 +3,10 @@ from django.contrib.admin.forms import AdminAuthenticationForm
 from django.core.exceptions import ValidationError
 
 from .permissions import is_technical_admin
+from .throttling import LoginThrottleMixin
 
 
-class TechnicalAdminAuthenticationForm(AdminAuthenticationForm):
+class TechnicalAdminAuthenticationForm(LoginThrottleMixin, AdminAuthenticationForm):
     def confirm_login_allowed(self, user):
         super().confirm_login_allowed(user)
         if not user.is_superuser:

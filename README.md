@@ -34,13 +34,15 @@ Para crear una cuenta técnica en un entorno local nuevo:
 
 Cada empleado puede tener un centro principal y cada turno puede indicar su centro. Al duplicar o copiar un turno se conserva el centro del turno original. El fichaje usa el centro del turno activo; si no hay turno activo con centro, el QR identifica un centro activo de la empresa del empleado. La IP pública debe coincidir con la configurada en ese centro.
 
-El superusuario técnico puede configurar la IP en `/administracion/companies/workplace/` y generar un QR desde la acción **Generar QR para los centros seleccionados**. La URL resultante se muestra una sola vez y debe guardarse para imprimir el QR. También puede configurarse desde consola:
+El superusuario técnico puede configurar la IP en `/administracion/companies/workplace/` y generar un QR desde la acción **Generar QR para los centros seleccionados**. La URL resultante se muestra una sola vez y debe guardarse para imprimir el QR. La acción **Revocar QR** invalida el anterior. También puede configurarse desde consola:
 
 ```bash
 ./.venv/bin/python manage.py setup_xarlot_clock --workplace-id ID --wifi-ip IP_PUBLICA --base-url https://tu-dominio
 ```
 
 Los campos QR/IP antiguos de `BusinessConfig` ya no autorizan fichajes. La migración `companies.0003` copia sus valores a un centro cuando existe uno solo; con varios centros, configura cada uno explícitamente antes de usar sus QR.
+
+El QR nuevo usa un identificador público de centro y un secreto en el fragmento de la URL; el secreto se envía al fichar por POST. Los QR antiguos con `?token=` siguen admitidos durante la transición y se pueden desactivar con `CLOCK_ALLOW_LEGACY_QR=0` después de reimprimirlos. La IP se toma de la conexión salvo que se declare un proxy confiable en `TRUSTED_PROXY_CIDRS`. La [guía de seguridad y transición del fichaje](docs/seguridad-fichaje-d2.md) explica configuración, impresión, rotación, límites de intentos y verificaciones de staging pendientes.
 
 ## Ventana de mantenimiento
 

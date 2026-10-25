@@ -31,4 +31,4 @@ class Command(BaseCommand):
         self.stdout.write(f'Centro: {workplace}')
         self.stdout.write(f'IP autorizada: {workplace.public_wifi_ip}')
         self.stdout.write('URL para imprimir como QR:')
-        self.stdout.write(f'{base_url}/fichar/?token={token}')
+        self.stdout.write(workplace.qr_url(f'{base_url}/fichar/', token))

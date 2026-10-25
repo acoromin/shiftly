@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib import messages
+from django.template.response import TemplateResponse
 from django.urls import reverse
 
 from .models import Company, JobPosition, Workplace
@@ -34,7 +35,7 @@ class WorkplaceAdmin(admin.ModelAdmin):
     search_fields = ('name', 'company__name', 'address', 'city', 'postal_code', 'public_wifi_ip')
     autocomplete_fields = ('company',)
     readonly_fields = ('created_at', 'updated_at', 'qr_configured')
-    actions = ('generate_qr',)
+    actions = ('generate_qr', 'revoke_qr')
     fieldsets = (
         ('Centro de trabajo', {
             'fields': ('company', 'name', 'is_active'),
@@ -59,12 +60,26 @@ class WorkplaceAdmin(admin.ModelAdmin):
 
     @admin.action(description='Generar QR para los centros seleccionados')
     def generate_qr(self, request, queryset):
+        urls = []
+        url = request.build_absolute_uri(reverse('timeclock:scan'))
         for workplace in queryset:
             token = Workplace.generate_qr_token()
             workplace.set_qr_token(token)
             workplace.save(update_fields=['qr_token_hash'])
-            url = request.build_absolute_uri(reverse('timeclock:scan'))
-            messages.warning(request, f'{workplace}: guarda esta URL para el QR: {url}?token={token}')
+            urls.append((str(workplace), workplace.qr_url(url, token)))
+        response = TemplateResponse(request, 'admin/workplace_qr_urls.html', {
+            **self.admin_site.each_context(request),
+            'title': 'QR nuevos de centros de trabajo',
+            'urls': urls,
+            'changelist_url': reverse('admin:companies_workplace_changelist'),
+        })
+        response['Cache-Control'] = 'no-store'
+        return response
+
+    @admin.action(description='Revocar QR de los centros seleccionados')
+    def revoke_qr(self, request, queryset):
+        count = queryset.update(qr_token_hash='')
+        messages.success(request, f'QR revocados: {count}.')
 
 
 @admin.register(JobPosition)

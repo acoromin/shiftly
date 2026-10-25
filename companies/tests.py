@@ -26,7 +26,25 @@ class CompanyModelTests(TestCase):
         self.assertEqual(response.status_code, 200)
         workplace.refresh_from_db()
         self.assertTrue(workplace.qr_token_hash)
-        self.assertContains(response, '/fichar/?token=')
+        self.assertContains(response, f'/fichar/#workplace={workplace.qr_public_id}&amp;token=')
+        self.assertIn('no-store', response.headers['Cache-Control'])
+        self.assertNotIn('messages', response.cookies)
+
+    def test_technical_admin_can_revoke_workplace_qr(self):
+        workplace = Workplace.objects.get(company__name='Xarlot')
+        workplace.set_qr_token('old-token')
+        workplace.save(update_fields=['qr_token_hash'])
+        technician = User.objects.create_superuser(username='technician', password='secret')
+        self.client.force_login(technician)
+
+        response = self.client.post(reverse('admin:companies_workplace_changelist'), {
+            'action': 'revoke_qr', '_selected_action': workplace.pk,
+        }, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        workplace.refresh_from_db()
+        self.assertEqual(workplace.qr_token_hash, '')
+        self.assertFalse(workplace.check_qr_token('old-token'))
 
     def test_clock_setup_configures_only_selected_workplace(self):
         company = Company.objects.get(name='Xarlot')
@@ -42,7 +60,7 @@ class CompanyModelTests(TestCase):
         token = output.getvalue().split('token=')[1].strip()
         self.assertTrue(selected.check_qr_token(token))
         self.assertFalse(other.check_qr_token(token))
-        self.assertIn('https://example.test/fichar/?token=', output.getvalue())
+        self.assertIn(f'https://example.test/fichar/#workplace={selected.qr_public_id}&token=', output.getvalue())
 
     def test_legacy_credentials_copy_only_to_single_workplace(self):
         config = BusinessConfig.get_solo()

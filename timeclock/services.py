@@ -1,20 +1,17 @@
 from datetime import timedelta
+from uuid import UUID
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from audit.models import AuditLog
 from companies.models import Workplace
+from core.network import get_client_ip
+from core.throttling import consume_attempt
 from scheduling.models import Shift
 
 from .models import TimeClockEntry
-
-
-def get_client_ip(request):
-    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if forwarded_for:
-        return forwarded_for.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
 
 
 def get_user_agent(request):
@@ -171,17 +168,30 @@ def create_audit_log(user, action, entry=None, ip_address=None, payload=None):
     )
 
 
-def attempt_clock(request, employee, token, related_shift=None):
+def attempt_clock(request, employee, token, related_shift=None, public_id=None):
     if related_shift is None and employee is not None and employee.company_id:
         related_shift = current_shift_for_employee(employee)
     context = resolve_timeclock_entry_context(employee, related_shift)
+    if not consume_attempt('clock', str(employee.pk), limit=20, window_seconds=60):
+        return False, 'Demasiados intentos de fichaje. Espera un minuto.', None
     workplaces = Workplace.objects.filter(company=context['company'], is_active=True)
     shift_workplace = related_shift.workplace if related_shift and related_shift.workplace_id else None
-    if shift_workplace:
-        matched_workplace = shift_workplace if shift_workplace.is_active and shift_workplace.check_qr_token(token) else None
-    else:
-        matches = [place for place in workplaces if place.check_qr_token(token)]
-        matched_workplace = matches[0] if len(matches) == 1 else None
+    matched_workplace = None
+    if token and len(token) <= 256 and public_id:
+        try:
+            public_uuid = UUID(str(public_id))
+        except (ValueError, AttributeError):
+            public_uuid = None
+        if public_uuid:
+            candidate = workplaces.filter(qr_public_id=public_uuid).first()
+            if candidate and (not shift_workplace or candidate.pk == shift_workplace.pk):
+                matched_workplace = candidate if candidate.check_qr_token(token) else None
+    elif token and len(token) <= 256 and settings.CLOCK_ALLOW_LEGACY_QR:
+        if shift_workplace:
+            matched_workplace = shift_workplace if shift_workplace.is_active and shift_workplace.check_qr_token(token) else None
+        else:
+            matches = [place for place in workplaces if place.check_qr_token(token)]
+            matched_workplace = matches[0] if len(matches) == 1 else None
     workplace = shift_workplace or matched_workplace
     ip_address = get_client_ip(request)
     user_agent = get_user_agent(request)

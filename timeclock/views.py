@@ -34,14 +34,15 @@ def _timeclock_entries_for_admin(profile):
 @login_required
 def scan(request):
     profile = getattr(request.user, 'employee_profile', None)
-    token = request.GET.get('token') or request.POST.get('token')
+    token = request.POST.get('token') if request.method == 'POST' else request.GET.get('token')
+    public_id = request.POST.get('workplace')
     if not profile or not profile.is_active:
         messages.error(request, 'Tu usuario no está asociado a un empleado activo.')
         return redirect('dashboard:index')
     ensure_missing_clock_incident(profile)
 
     if request.method == 'POST':
-        ok, message, _entry = attempt_clock(request, profile, token)
+        ok, message, _entry = attempt_clock(request, profile, token, public_id=public_id)
         if ok:
             messages.success(request, message)
         else:

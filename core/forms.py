@@ -1,9 +1,15 @@
 from django import forms
+from django.contrib.auth.forms import AuthenticationForm
 from django.utils import timezone
 
 from companies.models import Company
 
 from .models import BusinessConfig
+from .throttling import LoginThrottleMixin
+
+
+class RateLimitedAuthenticationForm(LoginThrottleMixin, AuthenticationForm):
+    pass
 
 
 class BusinessConfigForm(forms.ModelForm):

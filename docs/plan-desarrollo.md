@@ -1,6 +1,6 @@
 # Plan de desarrollo de Shiftly
 
-Fecha: 2026-10-22. Estado: plan vigente; D1 completada localmente, D2–D9 pendientes.
+Fecha: 2026-10-22. Estado: plan vigente; D1 completada localmente, D2 en curso, D3–D9 pendientes.
 
 Este documento es la única hoja de ruta vigente y define prioridades, alcance y criterios de salida. [estado-sesion.md](estado-sesion.md) conserva el avance real, las verificaciones y la siguiente tarea. Los planes anteriores se han retirado; sus versiones originales permanecen en Git y los cierres de fases se conservan en la bitácora.
 
@@ -35,12 +35,12 @@ El éxito del primer lanzamiento se mide por la fiabilidad de ese recorrido y la
 
 ## Orden de ejecución
 
-**D1 está completada localmente; D2–D9 siguen pendientes**. Cada una se divide en cambios pequeños que puedan revisarse y desplegarse. Una dependencia incompleta impide declarar cerrada la etapa dependiente.
+**D1 está completada localmente; D2 sigue en curso y D3–D9 pendientes**. Cada una se divide en cambios pequeños que puedan revisarse y desplegarse. Una dependencia incompleta impide declarar cerrada la etapa dependiente.
 
 | Etapa | Resultado | Dependencias | Condición para avanzar |
 | --- | --- | --- | --- |
 | D1 (cerrada localmente) | Separar permisos de plataforma y empresa | Fase 8 | Una empresa no altera la operación de otra |
-| D2 | Asegurar la identificación del centro y la IP | D1 | Cabeceras manipuladas y QR ajenos no autorizan fichajes |
+| D2 (en curso) | Asegurar la identificación del centro y la IP | D1 | Cabeceras manipuladas y QR ajenos no autorizan fichajes |
 | D3 | Corregir consultas y cálculo de horas | D1 | Consultar conserva aprobaciones y resultados históricos |
 | D4 | PostgreSQL, entornos y validación automática | D1–D3 | CI y staging reproducibles con PostgreSQL |
 | D5 | Fichajes y transiciones seguros ante concurrencia | D2–D4 | Reintentos y peticiones simultáneas conservan invariantes |
@@ -58,9 +58,11 @@ El éxito del primer lanzamiento se mide por la fiabilidad de ese recorrido y la
 
 **Resultado:** mantenimiento reservado al técnico; nombre y tolerancia por empresa; perfiles/empresas inactivos bloqueados en rutas cliente. [Matriz, inventario y migración](permisos-configuracion.md). Las verificaciones ejecutadas están en [estado-sesion.md](estado-sesion.md).
 
-**Siguiente tarea concreta (D2):** auditar cómo se obtiene la IP del cliente y reproducir con una prueba el uso de `X-Forwarded-For` falsificado antes de cambiar la política de proxies confiables.
+**D2 iniciada:** el fallo de `X-Forwarded-For` se reprodujo y se corrigió localmente. El avance, las verificaciones restantes y la guía operativa están en [seguridad-fichaje-d2.md](seguridad-fichaje-d2.md) y [estado-sesion.md](estado-sesion.md).
 
 ### D2 — Fichaje, red y credenciales de centro
+
+Implementación y pruebas locales en curso. La comprobación integrada de proxy, QR impreso y logs en staging sigue pendiente; D2 permanece abierta.
 
 - Definir el contrato de despliegue con proxy: origen permitido, cabeceras que se eliminan/reconstruyen y acceso directo a la aplicación. Usar la IP de conexión salvo que proceda de un proxy expresamente confiable.
 - Añadir pruebas de `X-Forwarded-For` falsificado, cadenas de proxies, IP inválida, QR de otra empresa, centro inactivo y credenciales revocadas.
